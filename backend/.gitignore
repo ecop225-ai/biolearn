@@ -1,0 +1,24 @@
+HELP.md
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### IDE ###
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+.settings/
+.classpath
+.project
+
+### Sistema operativo ###
+.DS_Store
+Thumbs.db
+
+### Configuración con secretos — nunca subir a Git ###
+application.properties
+application-local.properties
+.env
