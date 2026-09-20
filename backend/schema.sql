@@ -2,6 +2,8 @@
 -- BIOLearn — Modelo Relacional
 -- ═══════════════════════════════════════════════════════════════════════════
 
+CREATE DATABASE biolearn_db;
+USE biolearn_db;
 
 SET FOREIGN_KEY_CHECKS = 0;
 SET NAMES utf8mb4;
