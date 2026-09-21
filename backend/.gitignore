@@ -22,3 +22,5 @@ Thumbs.db
 application.properties
 application-local.properties
 .env
+
+.vscode/
