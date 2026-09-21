@@ -18,7 +18,6 @@ biolearn/
 - Mecanismos de seguridad
 - Mapa de navegación
 
-(Estos documentos se gestionan aparte del código; consulta con el equipo dónde están enlazados o agrégalos a una carpeta `docs/` si prefieres tenerlos también aquí.)
 
 ## Cómo empezar
 
