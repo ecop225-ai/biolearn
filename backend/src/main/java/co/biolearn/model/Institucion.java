@@ -42,9 +42,13 @@ public class Institucion {
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
 
-    /** Código de 8 caracteres que un estudiante usa al registrarse para afiliarse a esta institución. */
     @Column(name = "codigo_afiliacion", nullable = false, unique = true, length = 8)
     private String codigoAfiliacion;
+
+    /** Cupos de estudiantes contratados. NULL = sin límite definido (instituciones registradas antes de la migración 001).
+     *  Los cupos usados no se almacenan: se calculan contando perfil_estudiante activos afiliados. */
+    @Column(name = "cupos_contratados")
+    private Integer cuposContratados;
 
     @Column(name = "estado", nullable = false, length = 20)
     @Builder.Default

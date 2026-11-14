@@ -23,12 +23,10 @@ public class PerfilEstudiante {
     @Column(name = "id_estudiante")
     private Integer id;
 
-    /** Enlace 1 a 1 con Usuario (columna UNIQUE, no PK compartida). */
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_usuario", nullable = false, unique = true)
     private Usuario usuario;
 
-    /** Null si el estudiante es independiente (no afiliado a ninguna institución). */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_institucion")
     private Institucion institucion;

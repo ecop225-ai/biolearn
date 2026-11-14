@@ -22,7 +22,6 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Spring Security espera el prefijo "ROLE_" para usar hasRole("ESTUDIANTE") en los controllers.
         String rol = "ROLE_" + usuario.getTipoUsuario().name().toUpperCase();
         return List.of(new SimpleGrantedAuthority(rol));
     }
@@ -54,10 +53,8 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        // 'pendiente' puede iniciar sesión (aún no construimos el flujo de verificación de correo);
-        // solo bloqueamos cuentas explícitamente inactivas o suspendidas.
-        var estado = usuario.getEstado();
-        return estado != co.biolearn.enums.EstadoUsuario.inactivo
-                && estado != co.biolearn.enums.EstadoUsuario.suspendido;
+        // Solo una cuenta 'activo' puede iniciar sesión. 'pendiente' (sin verificar / invitación sin completar)
+        // e 'inactivo' quedan deshabilitadas. 'suspendido' se reporta antes como cuenta bloqueada (isAccountNonLocked).
+        return usuario.getEstado() == co.biolearn.enums.EstadoUsuario.activo;
     }
 }

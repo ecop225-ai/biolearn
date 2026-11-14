@@ -4,23 +4,26 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
-### IDE ###
+### IntelliJ IDEA ###
 .idea/
 *.iws
 *.iml
 *.ipr
-.vscode/
-.settings/
-.classpath
-.project
+out/
 
-### Sistema operativo ###
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### Archivos sensibles: NUNCA subir credenciales reales ###
+application.properties
+!application.properties.example
+
+### macOS / Windows ###
 .DS_Store
 Thumbs.db
-
-### Configuración con secretos — nunca subir a Git ###
-application.properties
-application-local.properties
-.env
-
-.vscode/

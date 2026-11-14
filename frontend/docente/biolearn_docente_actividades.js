@@ -134,7 +134,7 @@ function renderModalActividad() {
   if (document.getElementById('modal-actividad')) return;
   const div = document.createElement('div');
   div.innerHTML =
-    '<div class="modal-overlay" id="modal-actividad"><div class="modal"><div class="modal-header"><h3 id="act-modal-titulo">Nueva actividad</h3><button class="modal-close" onclick="cerrarModal(\'modal-actividad\')">✕</button></div>' +
+    '<div class="modal-overlay" id="modal-actividad"><div class="modal grande"><div class="modal-header"><h3 id="act-modal-titulo">Nueva actividad</h3><button class="modal-close" onclick="cerrarModal(\'modal-actividad\')">✕</button></div>' +
     '<div class="modal-body"><input type="hidden" id="act-id">' +
     '<div class="campo"><label>Nombre</label><input type="text" id="act-nombre" placeholder="Ej: Taller de cruces de Punnett"></div>' +
     '<div class="campo"><label>Descripción</label><textarea id="act-descripcion" rows="2"></textarea></div>' +

@@ -2,9 +2,8 @@
    BIOLearn — biolearn_auth_core.js
    Utilidades compartidas: marca, panel lateral, modal legal, router simple
 ================================================================ */
-
-// URL base del backend desplegado en Render
-const API_BASE = 'https://biolearn-mh03.onrender.com';
+/* URL del backend local — requiere que BiolearnBackendApplication esté corriendo en IntelliJ */
+const API_BASE = 'http://localhost:8080';
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function uid(p) { return p + '-' + Math.random().toString(36).slice(2, 8); }
@@ -17,26 +16,29 @@ function toast(text, esError) {
   setTimeout(() => el.remove(), 3200);
 }
 
-/* Instituciones de prueba con código de afiliación (8 caracteres, igual a la columna
-   codigo_afiliacion CHAR(8) de la tabla institucion), coherentes con el módulo Administrador */
-const INSTITUCIONES_DEMO = [
-  { codigo:'SANRAF26', nombre:'Colegio San Rafael' },
-  { codigo:'ANDINA26', nombre:'Corporación Andina de Estudios' },
-  { codigo:'SEMILL26', nombre:'Instituto Nueva Semilla' },
-];
+/* El código de institución ya no se valida contra una lista local: se consulta al backend
+   (GET /api/auth/validar-codigo-institucion). Los códigos tienen 8 caracteres, ej. SR7K2MQX
+   (ver backend/sql/datos_iniciales.sql). */
+const LONGITUD_CODIGO_INSTITUCION = 8;
 
-/* Catálogos de Grado y Área académica — coinciden con las tablas `grado` y `area_academica` de la base de datos.
-   Son obligatorios para registrar un estudiante (perfil_estudiante.id_grado / id_area son NOT NULL). */
-const GRADOS_DEMO = [
-  { id:1, nombre:'Sexto', nivel:'secundaria' }, { id:2, nombre:'Séptimo', nivel:'secundaria' },
-  { id:3, nombre:'Octavo', nivel:'secundaria' }, { id:4, nombre:'Noveno', nivel:'secundaria' },
-  { id:5, nombre:'Décimo', nivel:'media' }, { id:6, nombre:'Undécimo', nivel:'media' },
-];
-const AREAS_DEMO = [
-  { id:1, nombre:'Biología molecular' },
-  { id:2, nombre:'Ecología y conservación' },
-  { id:3, nombre:'Bioinformática' },
-];
+/* Catálogos de Grado y Área académica: se consultan al backend (endpoints públicos, solo activos).
+   GET /api/catalogos/grados y GET /api/catalogos/areas — así el registro siempre muestra lo que el
+   Administrador tiene habilitado en Catálogos, sin listas fijas en el código. */
+let CATALOGOS = { grados: [], areas: [], estado: 'cargando' }; // estado: cargando | ok | error
+
+async function cargarCatalogosRegistro() {
+  try {
+    const [rg, ra] = await Promise.all([
+      fetch(API_BASE + '/api/catalogos/grados'),
+      fetch(API_BASE + '/api/catalogos/areas')
+    ]);
+    if (!rg.ok || !ra.ok) throw new Error('error ' + (rg.ok ? ra.status : rg.status));
+    CATALOGOS = { grados: await rg.json(), areas: await ra.json(), estado: 'ok' };
+  } catch (err) {
+    CATALOGOS = { grados: [], areas: [], estado: 'error' };
+  }
+  if (typeof SCREEN !== 'undefined' && SCREEN === 'signup' && typeof render === 'function') render();
+}
 
 const TERMINOS_TEXTO = [
   { titulo:'1. Aceptación de los términos', texto:'Al crear una cuenta en BioLearn aceptas estos términos de uso. Si estás creando la cuenta de un menor de edad o eres menor de edad, esta cuenta debe contar con la autorización de tu acudiente.' },
@@ -131,25 +133,24 @@ function render() {
   if (SCREEN === 'login') root.innerHTML = pantallaLogin();
   else if (SCREEN === 'recover-request') root.innerHTML = pantallaRecuperar();
   else if (SCREEN === 'signup') { root.innerHTML = pantallaRegistro(); if (SIGNUP_STEP === 'form') actualizarValidacionSignup(); }
+  else if (SCREEN === 'activar') { root.innerHTML = pantallaActivar(); actualizarValidacion(); }
   window.scrollTo(0,0);
 }
 function onCampoInput() { if (typeof actualizarValidacion === 'function') actualizarValidacion(); }
 
-// Si esta página se abre desde el enlace real de un correo (?token=...), saltamos
-// directo a la pantalla de "crear nueva contraseña" con ese token ya cargado.
-// Hoy el backend aún no envía el correo, así que en la pantalla "sent" también
-// se puede pegar el token manualmente — ver pantallaRecuperarSent().
-function inicializarDesdeURL() {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
-  if (token) {
-    window._recToken = token;
-    SCREEN = 'recover-request';
-    RECOVER_STEP = 'reset';
-  }
-}
-
+/* Enlaces de correo (cuando se integre el envío real):
+   ...auth_prototipo.html?verificar=TOKEN   → verifica la cuenta de estudiante automáticamente
+   ...auth_prototipo.html?invitacion=TOKEN  → abre la activación de personal con el token cargado */
 document.addEventListener('DOMContentLoaded', function () {
-  inicializarDesdeURL();
+  cargarCatalogosRegistro();
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('verificar')) {
+    SCREEN = 'activar'; ACTIVAR.modo = 'estudiante'; ACTIVAR.token = params.get('verificar');
+    render(); verificarCuentaEstudiante();
+    return;
+  }
+  if (params.get('invitacion')) {
+    SCREEN = 'activar'; ACTIVAR.modo = 'invitacion'; ACTIVAR.token = params.get('invitacion');
+  }
   render();
 });

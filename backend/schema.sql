@@ -2,8 +2,6 @@
 -- BIOLearn — Modelo Relacional
 -- ═══════════════════════════════════════════════════════════════════════════
 
-CREATE DATABASE biolearn_db;
-USE biolearn_db;
 
 SET FOREIGN_KEY_CHECKS = 0;
 SET NAMES utf8mb4;
@@ -163,6 +161,7 @@ CREATE TABLE institucion (
     correo              VARCHAR(150)    NULL,
     logo_url            VARCHAR(500)    NULL,
     codigo_afiliacion   CHAR(8)         NOT NULL,              -- código que los estudiantes usan para afiliarse
+    cupos_contratados   SMALLINT UNSIGNED NULL,               -- cupos de estudiantes contratados (NULL = sin límite); los usados se calculan
     estado              ENUM('activa','inactiva','suspendida') NOT NULL DEFAULT 'activa',
     creado_en           DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

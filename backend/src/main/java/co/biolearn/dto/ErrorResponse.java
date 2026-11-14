@@ -1,5 +1,6 @@
 package co.biolearn.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,6 +17,10 @@ public class ErrorResponse {
     private LocalDateTime fecha;
     private int estadoHttp;
     private String mensaje;
-    /** Lista de errores de validación campo por campo (puede ser null si no aplica). */
     private List<String> detalles;
+
+    /** Código legible por máquina para que el frontend reaccione a casos puntuales
+     *  (ej. CUENTA_NO_VERIFICADA → ofrecer "Activar mi cuenta"). Se omite del JSON si es null. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String codigo;
 }

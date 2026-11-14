@@ -1,160 +1,227 @@
 /* ================================================================
    BIOLearn — biolearn_admin_catalogos_cursos.js
+   CATÁLOGOS: conectado al backend real (/api/catalogos/admin/**). Listado en tabla con pestañas
+   (Grados / Áreas académicas), filtros, Ver y Editar, igual que Gestión de usuarios.
+   No se borran: se inactivan, porque los usan los perfiles de estudiante y, más adelante, los cursos.
+   CURSOS: está en biolearn_admin_cursos.js, conectado al backend real.
 ================================================================ */
+let CAT_GRADOS = [];
+let CAT_AREAS = [];
+let CAT_TAB = 'grados';          // grados | areas
 let CAT_BUSQUEDA = '';
+let CAT_FILTRO_ESTADO = 'todos'; // todos | activo | inactivo
+let CAT_FILTRO_NIVEL = 'todos';  // solo grados: todos | primaria | secundaria | media
+let CAT_FILTRO_USO = 'todos';    // todos | con | sin (estudiantes asociados)
+
 function renderCatalogos(cont) {
-  const q = CAT_BUSQUEDA.toLowerCase();
-  const areasFiltradas = DATA.areas.filter(a => a.nombre.toLowerCase().includes(q) || (a.codigo||'').toLowerCase().includes(q));
-  let html = '<div class="section-header"><div><h2>Catálogos académicos</h2><p class="subtitle">Áreas académicas y grados disponibles para clasificar los cursos. Puedes editarlas si necesitan ajustes.</p></div>' +
-    '<button class="btn btn-primary" onclick="abrirModalArea()">+ Crear área académica</button></div>';
-  html += '<input id="cat-buscar" placeholder="Buscar por nombre o código (ej: BIOMOL)..." value="'+esc(CAT_BUSQUEDA)+'" oninput="CAT_BUSQUEDA=this.value;renderCatalogos(document.getElementById(\'app-content\'))" style="width:320px;margin-bottom:16px">';
-  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">';
-  areasFiltradas.forEach(area => {
-    html += '<div class="card"><div class="flex justify-between items-start mb-6"><h3 style="font-size:16.5px;margin:0">' + esc(area.nombre) + '</h3>' +
-      '<div class="flex gap-4"><button class="btn btn-ghost btn-xs" onclick="abrirModalArea(\''+area.id+'\')">✏️</button><button class="btn btn-ghost btn-xs" onclick="confirmarEliminarArea(\''+area.id+'\')" style="color:var(--clay)">🗑</button></div></div>' +
-      '<div class="text-sm mb-10" style="font-family:monospace;font-weight:700;color:var(--blue)">' + esc(area.codigo||'—') + '</div>' +
-      '<div class="flex gap-6 flex-wrap">' + (area.grados.length ? area.grados.map(g=>'<span class="pill pill-verde">'+esc(g)+'</span>').join('') : '<span class="text-sm muted">Sin grados definidos</span>') + '</div></div>';
-  });
-  if (areasFiltradas.length === 0) html += '<div class="empty-state">Sin resultados para "' + esc(CAT_BUSQUEDA) + '".</div>';
-  html += '</div>';
-  cont.innerHTML = html;
-  renderModalArea();
-}
-function confirmarEliminarArea(id) {
-  const area = DATA.areas.find(x=>x.id===id);
-  confirmarAccion('¿Eliminar <strong>' + esc(area.nombre) + '</strong>? Los cursos que la usan quedarán sin área asignada.', function () {
-    DATA.areas = DATA.areas.filter(x=>x.id!==id);
-    saveData(); render(); toast('Área "' + area.nombre + '" eliminada');
-  }, 'Eliminar');
-}
-function sugerirCodigoArea(nombre) {
-  return nombre.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z ]/g,'').split(' ').filter(Boolean).slice(0,2).map(w=>w.slice(0,4)).join('').toUpperCase();
-}
-function regenerarCodigoArea() {
-  const nombre = document.getElementById('area-nombre').value.trim();
-  if (!nombre) { toast('Escribe primero el nombre del área', true); return; }
-  document.getElementById('area-codigo').value = sugerirCodigoArea(nombre);
-}
-function abrirModalArea(id) {
-  const area = id ? DATA.areas.find(x=>x.id===id) : null;
-  document.getElementById('area-modal-titulo').textContent = area ? 'Editar área académica' : 'Crear área académica';
-  document.getElementById('area-modal-btn').textContent = area ? 'Guardar cambios' : 'Crear';
-  document.getElementById('area-id').value = area ? area.id : '';
-  document.getElementById('area-nombre').value = area ? area.nombre : '';
-  document.getElementById('area-codigo').value = area ? (area.codigo||'') : '';
-  document.getElementById('area-grados').value = area ? area.grados.join(', ') : '';
-  abrirModal('modal-area');
-}
-function renderModalArea() {
-  if (document.getElementById('modal-area')) return;
-  const div = document.createElement('div');
-  div.innerHTML = '<div class="modal-overlay" id="modal-area"><div class="modal"><div class="modal-header"><h3 id="area-modal-titulo">Crear área académica</h3><button class="modal-close" onclick="cerrarModal(\'modal-area\')">✕</button></div>' +
-    '<div class="modal-body"><input type="hidden" id="area-id"><div class="campo"><label>Nombre del área</label><input id="area-nombre"></div>' +
-    '<div class="campo"><label>Código (para búsqueda rápida)</label><div class="flex gap-8"><input id="area-codigo" style="flex:1;font-family:monospace" placeholder="Ej: BIOMOL"><button type="button" class="btn btn-ghost btn-sm" onclick="regenerarCodigoArea()">🔄 Generar</button></div></div>' +
-    '<div class="campo"><label>Grados (separados por coma)</label><input id="area-grados" placeholder="Introductorio, Intermedio, Avanzado"></div></div>' +
-    '<div class="modal-btns"><button class="btn btn-ghost" onclick="cerrarModal(\'modal-area\')">Cancelar</button><button class="btn btn-primary" id="area-modal-btn" onclick="guardarArea()">Crear</button></div></div></div>';
-  document.body.appendChild(div.firstElementChild);
-}
-function guardarArea() {
-  const id = document.getElementById('area-id').value, nombre = document.getElementById('area-nombre').value.trim();
-  if (!nombre) { toast('Escribe el nombre del área', true); return; }
-  let codigo = document.getElementById('area-codigo').value.trim().toUpperCase();
-  if (!codigo) codigo = sugerirCodigoArea(nombre);
-  const enUso = DATA.areas.find(a => a.codigo === codigo && a.id !== id);
-  if (enUso) { toast('Ese código ya lo usa "' + enUso.nombre + '" — elige otro', true); return; }
-  const grados = document.getElementById('area-grados').value.split(',').map(g=>g.trim()).filter(Boolean);
-  if (id) { Object.assign(DATA.areas.find(x=>x.id===id), { nombre, codigo, grados }); toast('Área "' + nombre + '" actualizada'); }
-  else { DATA.areas.unshift({ id:uid('area'), nombre, codigo, grados }); toast('Área académica "' + nombre + '" creada'); }
-  saveData(); cerrarModal('modal-area'); render();
+  cont.innerHTML = '<div class="section-header"><div><h2>Catálogos académicos</h2>' +
+    '<p class="subtitle">Grados y áreas académicas que se ofrecen en el registro de estudiantes y para clasificar cursos — conectado a tu backend real</p></div>' +
+    '<button class="btn btn-primary" id="cat-btn-agregar" onclick="abrirModalCatalogo(CAT_TAB === \'grados\' ? \'grado\' : \'area\')"></button></div>' +
+    '<div class="flex gap-8 mb-10">' +
+    '<button id="cat-tab-grados" class="btn btn-sm" onclick="cambiarTabCatalogo(\'grados\')">🎓 Grados</button>' +
+    '<button id="cat-tab-areas" class="btn btn-sm" onclick="cambiarTabCatalogo(\'areas\')">🧬 Áreas académicas</button></div>' +
+    '<div class="flex gap-10 flex-wrap mb-10">' +
+    '<input id="cat-buscar" placeholder="Buscar por nombre o descripción..." oninput="CAT_BUSQUEDA=this.value;pintarCatalogos()" style="width:300px">' +
+    '<select id="cat-f-estado" onchange="CAT_FILTRO_ESTADO=this.value;pintarCatalogos()" style="width:180px">' +
+    '<option value="todos">Todos los estados</option><option value="activo">Activos</option><option value="inactivo">Inactivos</option></select>' +
+    '<select id="cat-f-nivel" onchange="CAT_FILTRO_NIVEL=this.value;pintarCatalogos()" style="width:180px">' +
+    '<option value="todos">Todos los niveles</option><option value="primaria">Primaria</option><option value="secundaria">Secundaria</option><option value="media">Media</option></select>' +
+    '<select id="cat-f-uso" onchange="CAT_FILTRO_USO=this.value;pintarCatalogos()" style="width:220px">' +
+    '<option value="todos">Con o sin estudiantes</option><option value="con">Con estudiantes asociados</option><option value="sin">Sin estudiantes asociados</option></select>' +
+    '</div>' +
+    '<div id="cat-resumen" class="flex items-center gap-10 text-sm muted" style="margin-bottom:10px"></div>' +
+    '<div id="cat-lista">Cargando...</div>' +
+    '<p class="text-sm muted" style="margin-top:12px">Un grado o área inactivo deja de ofrecerse en el registro, pero los estudiantes que ya lo tienen lo conservan.</p>';
+  renderModalCatalogo();
+  renderModalDetalleCatalogo();
+  cambiarTabCatalogo(CAT_TAB, true);
+  cargarCatalogos();
 }
 
-/* ---------------------------- Cursos ---------------------------- */
-let CUR_FILTRO_ESTADO = 'todos';
-let CUR_BUSQUEDA = '';
-function renderCursos(cont) {
-  const q = CUR_BUSQUEDA.toLowerCase();
-  const filtrados = DATA.cursos.filter(c => (CUR_FILTRO_ESTADO==='todos' || c.estado===CUR_FILTRO_ESTADO) &&
-    (c.nombre.toLowerCase().includes(q) || (c.codigo||'').toLowerCase().includes(q)));
-  let html = '<div class="section-header"><div><h2>Gestión de cursos</h2><p class="subtitle">Supervisa los cursos creados por los docentes: aprueba, publica, archiva o retira contenido</p></div></div>';
-  html += '<input id="cur-buscar" placeholder="Buscar por nombre o código (ej: BIOMOL-101)..." value="'+esc(CUR_BUSQUEDA)+'" oninput="CUR_BUSQUEDA=this.value;renderCursos(document.getElementById(\'app-content\'))" style="width:320px;margin-bottom:14px">';
-  html += '<div class="flex gap-8 mb-14">';
-  ['todos','Publicado','En revisión','Borrador','Archivado'].forEach(e => {
-    const activo = CUR_FILTRO_ESTADO === e;
-    html += '<button onclick="CUR_FILTRO_ESTADO=\''+e+'\';render()" style="padding:7px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid '+(activo?'var(--blue)':'var(--line)')+';background:'+(activo?'var(--blue-soft)':'transparent')+';color:'+(activo?'var(--blue)':'var(--ink-soft)')+'">' + (e==='todos'?'Todos':e) + '</button>';
-  });
-  html += '</div>';
-  html += '<div class="tabla-wrap"><table><thead><tr style="background:var(--blue-soft)">' +
-    ['Código','Curso','Área','Docente','Inscritos','Lecciones','Precio','Estado',''].map(h=>'<th style="color:var(--blue)">'+h+'</th>').join('') + '</tr></thead><tbody>';
-  filtrados.forEach(c => {
-    html += '<tr><td style="font-family:monospace;font-weight:700;font-size:12.5px;color:var(--blue)">' + esc(c.codigo||'—') + '</td>' +
-      '<td style="font-weight:600;cursor:pointer" onclick="abrirModalCursoDetalle(\''+c.id+'\')">' + esc(c.nombre) + '</td>' +
-      '<td class="text-sm muted">' + esc(c.area) + '</td><td class="text-sm muted">' + esc(c.docente) + '</td>' +
-      '<td class="text-sm muted">' + c.inscritos + '</td><td class="text-sm muted">' + c.lecciones + '</td><td class="text-sm muted">' + money(c.precio) + '</td>' +
-      '<td>' + pill(c.estado) + '</td><td><div class="flex gap-8" style="justify-content:flex-end"><button class="btn btn-ghost btn-xs" onclick="abrirModalCursoDetalle(\''+c.id+'\')">✏️</button><button class="btn btn-ghost btn-xs" onclick="confirmarEliminarCurso(\''+c.id+'\')" style="color:var(--clay)">🗑</button></div></td></tr>';
-  });
-  if (filtrados.length === 0) html += '<tr><td colspan="9" class="empty-state">No hay cursos que coincidan.</td></tr>';
-  html += '</tbody></table></div>';
-  cont.innerHTML = html;
-  renderModalCursoDetalle();
-}
-function confirmarEliminarCurso(id) {
-  const c = DATA.cursos.find(x=>x.id===id);
-  confirmarAccion('¿Eliminar <strong>' + esc(c.nombre) + '</strong>? Se perderán sus lecciones, foros y materiales asociados.', function () {
-    DATA.cursos = DATA.cursos.filter(x=>x.id!==id);
-    saveData(); render(); toast('Curso "' + c.nombre + '" eliminado');
-  }, 'Eliminar');
-}
-function abrirModalCursoDetalle(id) {
-  const c = DATA.cursos.find(x=>x.id===id);
-  document.getElementById('cur-modal-titulo').textContent = 'Editar curso · ' + c.nombre;
-  document.getElementById('cur-id').value = c.id;
-  document.getElementById('cur-nombre').value = c.nombre;
-  document.getElementById('cur-codigo').value = c.codigo||'';
-  const selArea = document.getElementById('cur-area');
-  selArea.innerHTML = DATA.areas.map(a=>'<option value="'+esc(a.nombre)+'"'+(a.nombre===c.area?' selected':'')+'>'+esc(a.codigo||'')+' — '+esc(a.nombre)+'</option>').join('') + (!DATA.areas.some(a=>a.nombre===c.area) ? '<option value="'+esc(c.area)+'" selected>'+esc(c.area)+'</option>' : '');
-  const docentes = DATA.usuarios.filter(u=>u.rol==='docente');
-  const selDoc = document.getElementById('cur-docente');
-  selDoc.innerHTML = docentes.map(d=>'<option value="'+esc(d.nombre)+'"'+(d.nombre===c.docente?' selected':'')+'>'+esc(d.nombre)+'</option>').join('') + (!docentes.some(d=>d.nombre===c.docente) ? '<option value="'+esc(c.docente)+'" selected>'+esc(c.docente)+'</option>' : '');
-  document.getElementById('cur-precio').value = c.precio;
-  document.getElementById('cur-lecciones').value = c.lecciones;
-  document.getElementById('cur-info').textContent = c.inscritos + ' estudiante(s) inscritos actualmente · las lecciones pueden incluir lecturas, laboratorios y juegos externos, artículos científicos, foros, sesiones en línea y eventos virtuales.';
-  renderCursoEstadoAcciones(c);
-  abrirModal('modal-curso-detalle');
-}
-function renderCursoEstadoAcciones(c) {
-  let html = '';
-  if (c.estado !== 'Publicado') html += '<button class="btn btn-amber btn-sm" onclick="cambiarEstadoCursoAdmin(\''+c.id+'\',\'Publicado\')">Publicar</button> ';
-  if (c.estado === 'En revisión') html += '<button class="btn btn-danger btn-sm" onclick="cambiarEstadoCursoAdmin(\''+c.id+'\',\'Borrador\')">Devolver a borrador</button> ';
-  if (c.estado === 'Publicado') html += '<button class="btn btn-ghost btn-sm" onclick="cambiarEstadoCursoAdmin(\''+c.id+'\',\'Archivado\')">Archivar</button> ';
-  html += pill(c.estado);
-  document.getElementById('cur-estado-acciones').innerHTML = html;
-}
-function cambiarEstadoCursoAdmin(id, estado) {
-  const c = DATA.cursos.find(x=>x.id===id);
-  c.estado = estado; saveData(); renderCursoEstadoAcciones(c);
-  toast('Curso "' + c.nombre + '" ahora está ' + estado.toLowerCase());
-}
-function renderModalCursoDetalle() {
-  if (document.getElementById('modal-curso-detalle')) return;
-  const div = document.createElement('div');
-  div.innerHTML = '<div class="modal-overlay" id="modal-curso-detalle"><div class="modal" style="max-width:560px"><div class="modal-header"><h3 id="cur-modal-titulo">Editar curso</h3><button class="modal-close" onclick="cerrarModal(\'modal-curso-detalle\')">✕</button></div>' +
-    '<div class="modal-body"><input type="hidden" id="cur-id">' +
-    '<div class="grid-2"><div class="campo"><label>Nombre del curso</label><input id="cur-nombre"></div><div class="campo"><label>Código</label><input id="cur-codigo" style="font-family:monospace"></div></div>' +
-    '<div class="grid-2"><div class="campo"><label>Área académica</label><select id="cur-area"></select></div><div class="campo"><label>Docente</label><select id="cur-docente"></select></div></div>' +
-    '<div class="grid-2"><div class="campo"><label>Precio (COP)</label><input type="number" id="cur-precio"></div><div class="campo"><label>Número de lecciones</label><input type="number" id="cur-lecciones"></div></div>' +
-    '<p class="hint" id="cur-info" style="margin:-4px 0 16px"></p>' +
-    '<div class="flex gap-8 flex-wrap" id="cur-estado-acciones" style="border-top:1px solid var(--line);padding-top:16px;margin-bottom:14px"></div></div>' +
-    '<div class="modal-btns"><button class="btn btn-ghost" onclick="cerrarModal(\'modal-curso-detalle\')">Cancelar</button><button class="btn btn-primary" onclick="guardarCursoAdmin()">Guardar cambios</button></div></div></div>';
-  document.body.appendChild(div.firstElementChild);
-}
-function guardarCursoAdmin() {
-  const id = document.getElementById('cur-id').value, nombre = document.getElementById('cur-nombre').value.trim();
-  if (!nombre) { toast('Escribe el nombre del curso', true); return; }
-  const codigo = document.getElementById('cur-codigo').value.trim().toUpperCase();
-  const enUso = codigo && DATA.cursos.find(c => c.codigo === codigo && c.id !== id);
-  if (enUso) { toast('Ese código ya lo usa "' + enUso.nombre + '" — elige otro', true); return; }
-  Object.assign(DATA.cursos.find(x=>x.id===id), { nombre, codigo, area:document.getElementById('cur-area').value, docente:document.getElementById('cur-docente').value,
-    precio:Number(document.getElementById('cur-precio').value)||0, lecciones:Number(document.getElementById('cur-lecciones').value)||0 });
-  saveData(); cerrarModal('modal-curso-detalle'); render(); toast('Curso "' + nombre + '" modificado');
+function cambiarTabCatalogo(tab, sinPintar) {
+  CAT_TAB = tab;
+  document.getElementById('cat-tab-grados').className = 'btn btn-sm ' + (tab === 'grados' ? 'btn-primary' : 'btn-ghost');
+  document.getElementById('cat-tab-areas').className = 'btn btn-sm ' + (tab === 'areas' ? 'btn-primary' : 'btn-ghost');
+  document.getElementById('cat-btn-agregar').textContent = tab === 'grados' ? '+ Agregar grado' : '+ Agregar área';
+  document.getElementById('cat-f-nivel').style.display = tab === 'grados' ? '' : 'none';
+  if (tab !== 'grados') { CAT_FILTRO_NIVEL = 'todos'; document.getElementById('cat-f-nivel').value = 'todos'; }
+  if (!sinPintar) pintarCatalogos();
 }
 
+async function cargarCatalogos() {
+  const headers = authHeaders();
+  if (!headers) return;
+  try {
+    const [rg, ra] = await Promise.all([
+      fetch(API_BASE + '/api/catalogos/admin/grados', { headers }),
+      fetch(API_BASE + '/api/catalogos/admin/areas', { headers })
+    ]);
+    if (manejarSesionExpirada(rg) || manejarSesionExpirada(ra)) return;
+    if (rg.status === 403 || ra.status === 403) { toast('Tu usuario no tiene permisos de Administrador', true); return; }
+    if (!rg.ok || !ra.ok) throw new Error('El servidor respondió con error ' + (rg.ok ? ra.status : rg.status));
+    CAT_GRADOS = await rg.json();
+    CAT_AREAS = await ra.json();
+    pintarCatalogos();
+  } catch (err) {
+    document.getElementById('cat-lista').innerHTML = '<div class="empty-state">No se pudo cargar. ¿Está corriendo el backend? (' + esc(err.message) + ')</div>';
+  }
+}
+
+function normalizarTextoCat(t) {
+  return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function limpiarFiltrosCatalogos() {
+  CAT_BUSQUEDA = ''; CAT_FILTRO_ESTADO = 'todos'; CAT_FILTRO_NIVEL = 'todos'; CAT_FILTRO_USO = 'todos';
+  ['cat-buscar', 'cat-f-estado', 'cat-f-nivel', 'cat-f-uso'].forEach(id => {
+    const el = document.getElementById(id); el.value = id === 'cat-buscar' ? '' : 'todos';
+  });
+  pintarCatalogos();
+}
+
+function pintarCatalogos() {
+  const esGrado = CAT_TAB === 'grados';
+  const fuente = esGrado ? CAT_GRADOS : CAT_AREAS;
+  const q = normalizarTextoCat(CAT_BUSQUEDA.trim());
+  const lista = fuente.filter(x =>
+    (!q || normalizarTextoCat(x.nombre + ' ' + (x.descripcion || '')).includes(q)) &&
+    (CAT_FILTRO_ESTADO === 'todos' || x.estado === CAT_FILTRO_ESTADO) &&
+    (!esGrado || CAT_FILTRO_NIVEL === 'todos' || x.nivel === CAT_FILTRO_NIVEL) &&
+    (CAT_FILTRO_USO === 'todos' || (CAT_FILTRO_USO === 'con' ? x.estudiantesAsociados > 0 : !x.estudiantesAsociados)));
+
+  const activos = [];
+  if (CAT_FILTRO_ESTADO !== 'todos') activos.push('Estado: ' + CAT_FILTRO_ESTADO);
+  if (esGrado && CAT_FILTRO_NIVEL !== 'todos') activos.push('Nivel: ' + CAT_FILTRO_NIVEL);
+  if (CAT_FILTRO_USO !== 'todos') activos.push(CAT_FILTRO_USO === 'con' ? 'Con estudiantes' : 'Sin estudiantes');
+  if (q) activos.push('Búsqueda: "' + CAT_BUSQUEDA.trim() + '"');
+  const nombreTipo = esGrado ? (lista.length === 1 ? 'grado' : 'grados') : (lista.length === 1 ? 'área académica' : 'áreas académicas');
+  document.getElementById('cat-resumen').innerHTML = '<span>Mostrando <strong>' + lista.length + '</strong> ' + nombreTipo +
+    (activos.length ? ' · Filtros activos: ' + esc(activos.join(' · ')) : '') + '</span>' +
+    (activos.length ? '<button class="btn btn-ghost btn-xs" onclick="limpiarFiltrosCatalogos()">✕ Limpiar filtros</button>' : '');
+
+  const cols = esGrado ? ['Orden', 'Grado', 'Nivel', 'Estudiantes', 'Estado', ''] : ['Área académica', 'Descripción', 'Estudiantes', 'Estado', ''];
+  const tipo = esGrado ? 'grado' : 'area';
+  let html = '<div class="tabla-wrap"><table><thead><tr style="background:var(--blue-soft)">' +
+    cols.map(h => '<th style="color:var(--blue)">' + h + '</th>').join('') + '</tr></thead><tbody>';
+  lista.forEach(x => {
+    const estado = '<select onchange="cambiarEstadoCatalogo(\'' + tipo + '\',' + x.id + ',this.value)" style="width:auto;padding:4px 8px;font-size:12.5px">' +
+      ['activo', 'inactivo'].map(e => '<option value="' + e + '"' + (x.estado === e ? ' selected' : '') + '>' + e + '</option>').join('') + '</select>';
+    const acciones = '<td style="white-space:nowrap;text-align:right"><button class="btn btn-ghost btn-xs" onclick="verDetalleCatalogo(\'' + tipo + '\',' + x.id + ')">👁 Ver</button> ' +
+      '<button class="btn btn-ghost btn-xs" onclick="abrirModalCatalogo(\'' + tipo + '\',' + x.id + ')">✏️ Editar</button></td>';
+    const estilo = x.estado === 'inactivo' ? ' style="opacity:.6"' : '';
+    html += esGrado
+      ? '<tr' + estilo + '><td>' + x.orden + '</td><td style="font-weight:600">' + esc(x.nombre) + '</td><td>' + esc(x.nivel) + '</td><td>' + (x.estudiantesAsociados || 0) + '</td><td>' + estado + '</td>' + acciones + '</tr>'
+      : '<tr' + estilo + '><td style="font-weight:600">' + esc(x.nombre) + '</td><td class="text-sm muted">' + esc(x.descripcion || '—') + '</td><td>' + (x.estudiantesAsociados || 0) + '</td><td>' + estado + '</td>' + acciones + '</tr>';
+  });
+  if (!lista.length) html += '<tr><td colspan="' + cols.length + '" class="empty-state">No hay registros que coincidan.</td></tr>';
+  document.getElementById('cat-lista').innerHTML = html + '</tbody></table></div>';
+}
+
+/* ---------- Ver detalle: GET /api/catalogos/admin/grados/{id} o /areas/{id} ---------- */
+function renderModalDetalleCatalogo() {
+  if (document.getElementById('modal-detalle-catalogo')) return;
+  const div = document.createElement('div');
+  div.innerHTML = '<div class="modal-overlay" id="modal-detalle-catalogo"><div class="modal" style="max-width:480px"><div class="modal-header"><h3 id="cat-detalle-titulo">Detalle</h3>' +
+    '<button class="modal-close" onclick="cerrarModal(\'modal-detalle-catalogo\')">✕</button></div>' +
+    '<div class="modal-body" id="cat-detalle-body">Cargando...</div><div class="modal-btns" id="cat-detalle-btns"></div></div></div>';
+  document.body.appendChild(div.firstElementChild);
+}
+
+async function verDetalleCatalogo(tipo, id) {
+  const headers = authHeaders();
+  if (!headers) return;
+  const esGrado = tipo === 'grado';
+  document.getElementById('cat-detalle-titulo').textContent = esGrado ? 'Detalle del grado' : 'Detalle del área académica';
+  document.getElementById('cat-detalle-body').innerHTML = 'Cargando...';
+  document.getElementById('cat-detalle-btns').innerHTML = '';
+  abrirModal('modal-detalle-catalogo');
+  try {
+    const response = await fetch(API_BASE + '/api/catalogos/admin/' + (esGrado ? 'grados/' : 'areas/') + id, { headers });
+    if (manejarSesionExpirada(response)) return;
+    const x = await response.json();
+    if (!response.ok) throw new Error(x.mensaje || 'No se pudo cargar el registro.');
+    const fila = (k, v) => '<div class="flex justify-between" style="padding:8px 0;border-bottom:1px solid var(--line, #eee)"><span class="muted">' + k + '</span><span style="font-weight:600;text-align:right">' + v + '</span></div>';
+    document.getElementById('cat-detalle-body').innerHTML =
+      fila('ID', x.id) + fila('Nombre', esc(x.nombre)) +
+      (esGrado ? fila('Nivel', esc(x.nivel)) + fila('Orden en la lista', x.orden) : '') +
+      fila('Descripción', esc(x.descripcion || '—')) + fila('Estado', esc(x.estado)) +
+      fila('Estudiantes asociados', x.estudiantesAsociados) +
+      (x.estado === 'inactivo' ? '<p class="text-sm muted" style="margin-top:10px">Inactivo: no se ofrece en el registro de estudiantes.</p>' : '');
+    document.getElementById('cat-detalle-btns').innerHTML =
+      '<button class="btn btn-ghost" onclick="cerrarModal(\'modal-detalle-catalogo\')">Cerrar</button>' +
+      '<button class="btn btn-primary" onclick="cerrarModal(\'modal-detalle-catalogo\');abrirModalCatalogo(\'' + tipo + '\',' + x.id + ')">✏️ Editar</button>';
+  } catch (err) {
+    document.getElementById('cat-detalle-body').innerHTML = '<div class="empty-state">' + esc(err.message) + '</div>';
+  }
+}
+
+function abrirModalCatalogo(tipo, id) {
+  const lista = tipo === 'grado' ? CAT_GRADOS : CAT_AREAS;
+  const item = id ? lista.find(x => x.id === id) : null;
+  const nombreTipo = tipo === 'grado' ? 'grado' : 'área académica';
+  document.getElementById('cat-modal-titulo').textContent = (item ? 'Editar ' : 'Agregar ') + nombreTipo;
+  document.getElementById('cat-tipo').value = tipo;
+  document.getElementById('cat-id').value = item ? item.id : '';
+  document.getElementById('cat-nombre').value = item ? item.nombre : '';
+  document.getElementById('cat-descripcion').value = item ? (item.descripcion || '') : '';
+  document.getElementById('cat-campos-grado').style.display = tipo === 'grado' ? '' : 'none';
+  if (tipo === 'grado') {
+    document.getElementById('cat-nivel').value = item ? item.nivel : 'secundaria';
+    document.getElementById('cat-orden').value = item ? item.orden : (CAT_GRADOS.reduce((m, x) => Math.max(m, x.orden), 0) + 1);
+  }
+  abrirModal('modal-catalogo');
+}
+
+function renderModalCatalogo() {
+  if (document.getElementById('modal-catalogo')) return;
+  const div = document.createElement('div');
+  div.innerHTML = '<div class="modal-overlay" id="modal-catalogo"><div class="modal" style="max-width:460px"><div class="modal-header"><h3 id="cat-modal-titulo">Agregar</h3><button class="modal-close" onclick="cerrarModal(\'modal-catalogo\')">✕</button></div>' +
+    '<div class="modal-body"><input type="hidden" id="cat-tipo"><input type="hidden" id="cat-id">' +
+    '<div class="campo"><label for="cat-nombre">Nombre *</label><input id="cat-nombre" maxlength="100"></div>' +
+    '<div id="cat-campos-grado" class="grid-2"><div class="campo"><label for="cat-nivel">Nivel *</label><select id="cat-nivel">' +
+    '<option value="primaria">Primaria</option><option value="secundaria">Secundaria</option><option value="media">Media</option></select></div>' +
+    '<div class="campo"><label for="cat-orden">Orden en la lista *</label><input id="cat-orden" type="number" min="1" max="255"></div></div>' +
+    '<div class="campo"><label for="cat-descripcion">Descripción</label><input id="cat-descripcion"></div></div>' +
+    '<div class="modal-btns"><button class="btn btn-ghost" onclick="cerrarModal(\'modal-catalogo\')">Cancelar</button><button class="btn btn-primary" id="cat-modal-btn" onclick="guardarCatalogo()">Guardar</button></div></div></div>';
+  document.body.appendChild(div.firstElementChild);
+}
+
+async function guardarCatalogo() {
+  const headers = authHeaders();
+  if (!headers) return;
+  const tipo = document.getElementById('cat-tipo').value, id = document.getElementById('cat-id').value;
+  const cuerpo = { nombre: document.getElementById('cat-nombre').value.trim(), descripcion: document.getElementById('cat-descripcion').value.trim() };
+  if (tipo === 'grado') { cuerpo.nivel = document.getElementById('cat-nivel').value; cuerpo.orden = Number(document.getElementById('cat-orden').value) || null; }
+  if (!cuerpo.nombre) { toast('Escribe el nombre', true); return; }
+  const ruta = '/api/catalogos/admin/' + (tipo === 'grado' ? 'grados' : 'areas') + (id ? '/' + id : '');
+  try {
+    const response = await fetch(API_BASE + ruta, { method: id ? 'PATCH' : 'POST', headers, body: JSON.stringify(cuerpo) });
+    if (manejarSesionExpirada(response)) return;
+    const data = await response.json();
+    if (!response.ok) throw new Error((data.detalles && data.detalles.length ? data.detalles.join(' · ') : data.mensaje) || 'No se pudo guardar.');
+    cerrarModal('modal-catalogo');
+    // Concordancia de género: "Grado ... creado/actualizado", "Área ... creada/actualizada"
+    const esGrado = tipo === 'grado';
+    toast((esGrado ? 'Grado' : 'Área') + ' "' + data.nombre + '" ' + (id ? (esGrado ? 'actualizado' : 'actualizada') : (esGrado ? 'creado' : 'creada')));
+    cargarCatalogos();
+  } catch (err) { toast(err.message, true); }
+}
+
+async function cambiarEstadoCatalogo(tipo, id, estado) {
+  const headers = authHeaders();
+  if (!headers) return;
+  try {
+    const response = await fetch(API_BASE + '/api/catalogos/admin/' + (tipo === 'grado' ? 'grados' : 'areas') + '/' + id + '/estado', {
+      method: 'PATCH', headers, body: JSON.stringify({ estado })
+    });
+    if (manejarSesionExpirada(response)) return;
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.mensaje || 'No se pudo cambiar el estado.');
+    // El estado del backend es activo/inactivo; para las áreas se muestra en femenino (activa/inactiva)
+    const estadoTexto = tipo === 'grado' ? data.estado : (data.estado === 'activo' ? 'activa' : 'inactiva');
+    toast('"' + data.nombre + '" quedó ' + estadoTexto);
+    cargarCatalogos();
+  } catch (err) { toast(err.message, true); cargarCatalogos(); }
+}
+
+/* CURSOS: se movió a biolearn_admin_cursos.js (conectado al backend real, Fase 1 del módulo de Cursos). */

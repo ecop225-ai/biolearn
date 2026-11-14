@@ -156,7 +156,7 @@ textarea { resize:vertical; }
 .context-hint { font-size:11.5px; color:var(--ink-soft); margin:6px 0 0; }
 
 /* ---------------- Toast ---------------- */
-#toast-wrap { position:fixed; bottom:24px; right:24px; display:flex; flex-direction:column; gap:10px; z-index:200; }
+#toast-wrap { position:fixed; top:16px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:10px; z-index:200; pointer-events:none; }
 .toast-item { background:var(--blue-deep); color:#F6F3EC; padding:12px 18px; border-radius:10px; font-size:14px; font-weight:500; box-shadow:0 8px 24px rgba(27,50,44,.25); min-width:240px; display:flex; align-items:center; gap:10px; animation:toast-in .25s ease; }
 .toast-item.error { background:var(--clay); }
 @keyframes toast-in { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:translateY(0);} }
@@ -247,4 +247,5 @@ textarea { resize:vertical; }
   #app-content { padding:20px 16px; }
   .kpi-row { flex-direction:column; }
 }
-#toast-cnt-box { position:fixed; bottom:24px; right:24px; display:flex; flex-direction:column; gap:10px; z-index:200; }
+/* DEF-004: arriba al centro y sin capturar clics, para no tapar los botones de las últimas filas de las tablas */
+#toast-cnt-box { position:fixed; top:16px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:10px; z-index:200; pointer-events:none; }

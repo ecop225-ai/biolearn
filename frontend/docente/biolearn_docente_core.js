@@ -16,7 +16,56 @@ const LOGO_BIOLEARN_FULL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAYEAAA
 
 const STORAGE_KEY = "biolearn_docente_state_v5";
 
-const DOCENTE = { nombre: "Laura Restrepo", email: "laura.restrepo@biolearn.co" };
+/* Docente que inició sesión (guardado por el prototipo de Auth al hacer login). */
+const DOCENTE = (function () {
+  try {
+    const u = JSON.parse(sessionStorage.getItem('biolearn_usuario') || 'null');
+    if (u && u.nombre) return { nombre: (u.nombre + ' ' + (u.apellido || '')).trim(), email: u.correo || '' };
+  } catch (e) { /* sesión ausente o dañada */ }
+  return { nombre: 'Docente', email: '' };
+})();
+
+/* URL del backend local: requiere que BiolearnBackendApplication esté corriendo */
+const API_BASE = 'http://localhost:8080';
+
+/** Cabeceras con el token JWT de la sesión; si no hay token, vuelve al login. */
+function authHeaders() {
+  const token = sessionStorage.getItem('biolearn_token');
+  if (!token) {
+    toast('Tu sesión expiró o no iniciaste sesión. Redirigiendo al login...', true);
+    setTimeout(() => { window.location.href = '../prototipo-auth/biolearn_auth_prototipo.html'; }, 1200);
+    return null;
+  }
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+}
+
+/** Si el backend responde 401, limpia la sesión y vuelve al login. Devuelve true si era 401. */
+function manejarSesionExpirada(response) {
+  if (response.status !== 401) return false;
+  sessionStorage.removeItem('biolearn_token');
+  sessionStorage.removeItem('biolearn_usuario');
+  toast('Tu sesión expiró o tu cuenta ya no está activa. Inicia sesión nuevamente.', true);
+  setTimeout(() => { window.location.href = '../prototipo-auth/biolearn_auth_prototipo.html'; }, 1200);
+  return true;
+}
+
+/* Igual que en el prototipo del Administrador (DEF-003): el portal solo se dibuja para una sesión con rol "docente". */
+function verificarAccesoDocente() {
+  const token = sessionStorage.getItem('biolearn_token');
+  let usuario = null;
+  try { usuario = JSON.parse(sessionStorage.getItem('biolearn_usuario') || 'null'); } catch (e) { usuario = null; }
+  const irAlLogin = () => { window.location.href = '../prototipo-auth/biolearn_auth_prototipo.html'; };
+  if (!token || !usuario) { irAlLogin(); return false; }
+  if (usuario.rol !== 'docente') {
+    document.body.innerHTML =
+      '<div id="acceso-denegado" style="max-width:480px;margin:12vh auto;padding:32px;background:#fff;border-radius:16px;box-shadow:0 8px 24px rgba(27,50,44,.15);font-family:inherit;text-align:center">' +
+      '<div style="font-size:40px">🔒</div><h2 style="margin:12px 0 8px">Acceso solo para docentes</h2>' +
+      '<p style="color:#555;line-height:1.5">Esta sección es exclusiva de los docentes. Tu cuenta (' + esc(usuario.nombre || '') + ', rol ' + esc(usuario.rol || 'desconocido') + ') no tiene acceso. Te llevaremos al inicio de sesión.</p></div>';
+    setTimeout(irAlLogin, 2500);
+    return false;
+  }
+  return true;
+}
 
 /* Áreas académicas: las define el administrador en su módulo (Catálogos académicos).
    El docente las selecciona de esta lista en vez de escribirlas libremente. */
@@ -467,6 +516,7 @@ function setCtx(prefix, campo, value) {
 
 /* ---------------------------- arranque ---------------------------- */
 document.addEventListener('DOMContentLoaded', function () {
+  if (!verificarAccesoDocente()) return;
   loadData();
   render();
   try {
@@ -509,10 +559,10 @@ function abrirEnlaceExterno(url, plataforma) {
 
 function confirmarCerrarSesion() {
   confirmarAccion('¿Cerrar sesión? Volverás a la pantalla de inicio de sesión.', function () {
+    sessionStorage.removeItem('biolearn_token');
+    sessionStorage.removeItem('biolearn_usuario');
     toast('Sesión cerrada');
-    setTimeout(function () {
-      document.getElementById('app-content').innerHTML = '<div class="empty-state" style="padding:80px 20px"><h2 style="font-family:\'Fraunces\',serif">Sesión cerrada</h2><p class="muted">En la plataforma real, aquí volverías a la pantalla de inicio de sesión.</p></div>';
-    }, 300);
+    setTimeout(function () { window.location.href = '../prototipo-auth/biolearn_auth_prototipo.html'; }, 600);
   }, 'Cerrar sesión');
 }
 function abrirModal(id) { const m = document.getElementById(id); if (m) m.classList.add('open'); }

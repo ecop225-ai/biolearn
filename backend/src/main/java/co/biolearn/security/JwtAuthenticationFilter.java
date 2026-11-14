@@ -9,16 +9,13 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/**
- * Se ejecuta en cada petición: si viene un header "Authorization: Bearer <token>" válido,
- * deja al usuario autenticado en el contexto de seguridad para el resto de la petición.
- */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -44,16 +41,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             correo = jwtUtil.extraerCorreo(token);
         } catch (Exception ex) {
-            // Token corrupto/expirado: seguimos sin autenticar; el endpoint protegido devolverá 401/403.
+            // Token corrupto/expirado: seguimos sin autenticar; el EntryPoint responderá 401.
         }
 
         if (correo != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = userDetailsService.loadUserByUsername(correo);
-            if (jwtUtil.esTokenValido(token, userDetails)) {
-                var authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+            try {
+                UserDetails userDetails = userDetailsService.loadUserByUsername(correo);
+                // Además de firma y expiración, se exige que la cuenta siga habilitada:
+                // si el admin desactiva o suspende a alguien, su token deja de servir de inmediato
+                // (antes seguía funcionando hasta que expiraba, hasta 8 horas después).
+                if (jwtUtil.esTokenValido(token, userDetails)
+                        && userDetails.isEnabled()
+                        && userDetails.isAccountNonLocked()) {
+                    var authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities());
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
+            } catch (UsernameNotFoundException ex) {
+                // El usuario del token ya no existe: se trata igual que un token inválido (401).
             }
         }
 

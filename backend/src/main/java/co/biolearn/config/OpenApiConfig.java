@@ -8,8 +8,6 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Habilita el botón "Authorize" en Swagger para probar endpoints protegidos con JWT.
- * Al pegar "Bearer TU_TOKEN" ahí, Swagger lo agrega automáticamente
- * al header Authorization de cada petición que hagas desde la interfaz.
  */
 @Configuration
 @OpenAPIDefinition(

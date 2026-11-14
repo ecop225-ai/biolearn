@@ -1,8 +1,11 @@
 package co.biolearn.repository;
 
+import co.biolearn.enums.EstadoUsuario;
+import co.biolearn.enums.RolUsuario;
 import co.biolearn.model.Usuario;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
@@ -15,9 +18,11 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
 
     boolean existsByNombreUsuario(String nombreUsuario);
 
-    /**
-     * Login por correo o por nombre de usuario indistintamente,
-     * tal como se muestra en el prototipo de Auth ("Correo o nombre de usuario").
-     */
     Optional<Usuario> findByCorreoOrNombreUsuario(String correo, String nombreUsuario);
+
+    List<Usuario> findByTipoUsuario(RolUsuario rol);
+
+    List<Usuario> findByEstado(EstadoUsuario estado);
+
+    List<Usuario> findByTipoUsuarioAndEstado(RolUsuario rol, EstadoUsuario estado);
 }

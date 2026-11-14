@@ -2,7 +2,6 @@ package co.biolearn.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -37,7 +36,7 @@ public class JwtUtil {
                 .subject(userDetails.getUsername())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiracionMs))
-                .signWith(obtenerLlave(), SignatureAlgorithm.HS256)
+                .signWith(obtenerLlave(), Jwts.SIG.HS256) // API vigente de jjwt 0.12 (SignatureAlgorithm está deprecado)
                 .compact();
     }
 

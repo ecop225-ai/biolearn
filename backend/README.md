@@ -1,51 +1,53 @@
 # BioLearn — Backend
 
-API REST de BioLearn, construida en Java + Spring Boot, con persistencia en MySQL.
+API REST de la plataforma educativa BioLearn, construida con Java 17 y Spring Boot 3.3.4.
 
 ## Requisitos
+- JDK 17 (Eclipse Temurin recomendado)
+- Maven (gestionado por el wrapper de Spring Boot / IntelliJ)
+- MySQL 8.x
 
-- JDK 17 o superior
-- Maven (viene integrado en IntelliJ, no hace falta instalarlo aparte)
-- MySQL Server 8.x corriendo en `localhost:3306`
+## Puesta en marcha
 
-## Primeros pasos
-
-1. Crea la base de datos ejecutando `schema.sql` (está en la raíz del proyecto) en MySQL Workbench o por consola:
+1. Crea la base de datos, las tablas y los datos iniciales (detalle en `documentos/10_guia_entorno.md`):
    ```
-   mysql -u root -p < schema.sql
+   mysql -u root -p -e "CREATE DATABASE biolearn_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+   mysql -u root -p biolearn_db < schema.sql
+   mysql -u root -p < sql/datos_iniciales.sql
    ```
-2. Copia `src/main/resources/application.properties.example` a `src/main/resources/application.properties`.
-3. Edita `application.properties` con tu usuario y clave reales de MySQL.
-4. Abre el proyecto en IntelliJ IDEA (`File → Open` y selecciona esta carpeta).
-5. Espera a que Maven descargue las dependencias (aparece abajo a la derecha).
-6. Ejecuta `BiolearnBackendApplication.java` (botón ▶ verde).
-7. La API queda disponible en `http://localhost:8080`.
-8. La documentación interactiva (Swagger) queda en `http://localhost:8080/swagger-ui.html`.
+   Si tu base ya existía, aplica en su lugar las migraciones pendientes de `sql/migraciones/` (en orden) y luego `sql/datos_iniciales.sql`.
+2. Copia `src/main/resources/application.properties.example` como `application.properties` (en la misma carpeta) y completa tu contraseña real de MySQL y una clave JWT de al menos 32 caracteres.
+3. Abre la carpeta `backend/` en IntelliJ IDEA como proyecto Maven.
+4. Ejecuta la clase `BiolearnBackendApplication`.
+5. Verifica en `http://localhost:8080/swagger-ui.html`. Administrador inicial: `admin@biolearn.co` / `Admin2026` (cámbiala).
+
+Mientras no haya envío real de correos, los tokens de activación, invitación y recuperación se imprimen en la consola de IntelliJ.
+
+## Scripts SQL
+
+| Archivo | Uso |
+|---|---|
+| `schema.sql` | Estructura completa (51 tablas). Siempre refleja la versión más reciente del modelo. |
+| `sql/datos_iniciales.sql` | Grados, áreas académicas, administrador inicial e instituciones de prueba. Idempotente (`INSERT IGNORE`). |
+| `sql/migraciones/001_cupos_institucion.sql` | Agrega `institucion.cupos_contratados` a bases creadas antes de este cambio. |
+| `sql/migraciones/002_sincronizar_estado_supervisores.sql` | Corrige supervisores desactivados antes de la regla de representante único, cuyo vínculo con la institución había quedado activo. |
 
 ## Estructura de paquetes
 
-Corresponde al diagrama de paquetes del documento de arquitectura:
-
 ```
 co.biolearn
- ├── config       → configuración de Spring (CORS, Swagger)
- ├── security     → JWT, filtros de autenticación
+ ├── config       → configuración general (seguridad, OpenAPI, CORS)
  ├── controller   → endpoints REST
- ├── dto          → objetos de entrada/salida de la API
- ├── service      → interfaces de lógica de negocio
- │    └── impl    → implementación de esa lógica
- ├── repository   → acceso a datos (Spring Data JPA)
- ├── model        → entidades (tablas de la base de datos)
+ ├── dto          → objetos de transferencia de datos (entrada/salida de la API)
  ├── enums        → catálogos fijos (roles, estados)
- ├── exception    → manejo de errores
- └── util         → utilidades y mapeadores
+ ├── exception    → manejo centralizado de errores
+ ├── model        → entidades JPA (mapean las tablas de la base de datos)
+ ├── repository   → acceso a datos (Spring Data JPA)
+ ├── security     → autenticación JWT
+ └── service      → lógica de negocio
 ```
 
-## Convenciones de commits (sugeridas)
+## Módulos implementados
 
-```
-feat: agrega endpoint de login
-fix: corrige validación de código de institución
-docs: actualiza README
-test: agrega pruebas unitarias de PagoService
-```
+- **Autenticación** (`/api/auth/**`): registro público de estudiantes (con validación de código de institución y cupos), login (solo cuentas activas), verificación de correo y su reenvío, activación de invitaciones de personal, recuperación y restablecimiento de contraseña, consulta del usuario autenticado.
+- **Usuarios** (`/api/usuarios/**`, exclusivo de rol ADMIN): creación de cuentas de Docente, Contador y Supervisor institucional (un representante activo por institución), listado con filtros, detalle, edición de perfil, cambio de estado y reenvío de invitaciones.

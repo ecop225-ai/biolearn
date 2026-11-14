@@ -28,6 +28,9 @@ public class Grado {
     @Column(name = "orden", nullable = false)
     private Integer orden;
 
+    @Column(name = "descripcion")
+    private String descripcion;
+
     @Column(name = "estado", nullable = false, length = 20)
     @Builder.Default
     private String estado = "activo";

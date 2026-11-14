@@ -4,7 +4,7 @@
    Paleta "institucional": índigo + dorado
 ================================================================ */
 
-const STORAGE_KEY = "biolearn_supervisor_state_v1";
+const STORAGE_KEY = "biolearn_supervisor_state_v2"; // v2: código de afiliación de 8 caracteres
 const SUPERVISOR = { nombre: "Mónica Salazar", cargo: "Supervisor", email: "monica.salazar@sanrafael.edu.co" };
 
 function uid(p) { return p + '-' + Math.random().toString(36).slice(2, 8); }
@@ -16,7 +16,7 @@ function seedData() {
   const institucion = {
     nombre:'Colegio San Rafael', nit:'900.223.114-2', rector:'Dr. Fernando Ríos',
     telefono:'601 745 8820', correo:'rectoria@sanrafael.edu.co', direccion:'Cra 8 # 14-32, Popayán, Cauca',
-    codigoAfiliacion:'SANRAFAEL2026', estudiantesAfiliados:5, fechaRegistro:'2026-01-15',
+    codigoAfiliacion:'SR7K2MQX', estudiantesAfiliados:5, fechaRegistro:'2026-01-15',
     supervisores:['Mónica Salazar', 'Ricardo Peña'],
   };
 

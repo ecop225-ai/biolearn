@@ -1,9 +1,12 @@
 package co.biolearn.service.impl;
 
+import co.biolearn.dto.CompletarInvitacionRequest;
+import co.biolearn.dto.InstitucionPublicaResponse;
 import co.biolearn.dto.LoginRequest;
 import co.biolearn.dto.LoginResponse;
 import co.biolearn.dto.MensajeResponse;
 import co.biolearn.dto.RecuperarPasswordRequest;
+import co.biolearn.dto.ReenviarVerificacionRequest;
 import co.biolearn.dto.RegistroEstudianteRequest;
 import co.biolearn.dto.RestablecerPasswordRequest;
 import co.biolearn.dto.UsuarioResponse;
@@ -11,8 +14,8 @@ import co.biolearn.enums.EstadoEstudiante;
 import co.biolearn.enums.EstadoToken;
 import co.biolearn.enums.EstadoUsuario;
 import co.biolearn.enums.RolUsuario;
-import co.biolearn.enums.TipoVerificacion;
 import co.biolearn.exception.CredencialesInvalidasException;
+import co.biolearn.exception.CuentaNoVerificadaException;
 import co.biolearn.exception.RecursoNoEncontradoException;
 import co.biolearn.exception.SolicitudInvalidaException;
 import co.biolearn.model.AreaAcademica;
@@ -28,19 +31,22 @@ import co.biolearn.repository.InstitucionRepository;
 import co.biolearn.repository.PerfilEstudianteRepository;
 import co.biolearn.repository.RecuperacionContrasenaRepository;
 import co.biolearn.repository.UsuarioRepository;
-import co.biolearn.repository.VerificacionCuentaRepository;
 import co.biolearn.security.CustomUserDetails;
 import co.biolearn.security.JwtUtil;
 import co.biolearn.service.AuthService;
+import co.biolearn.service.TokenVerificacionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -55,14 +61,14 @@ public class AuthServiceImpl implements AuthService {
     private final GradoRepository gradoRepository;
     private final AreaAcademicaRepository areaAcademicaRepository;
     private final RecuperacionContrasenaRepository recuperacionRepository;
-    private final VerificacionCuentaRepository verificacionRepository;
+    private final TokenVerificacionService tokenService;
 
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
 
     private static final int MINUTOS_EXPIRACION_RECUPERACION = 30;
-    private static final int HORAS_EXPIRACION_VERIFICACION = 24;
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     @Override
     public LoginResponse login(LoginRequest request) {
@@ -72,6 +78,16 @@ public class AuthServiceImpl implements AuthService {
             );
         } catch (BadCredentialsException ex) {
             throw new CredencialesInvalidasException("Usuario o contraseña incorrectos");
+        } catch (DisabledException ex) {
+            // DisabledException cubre 'pendiente' e 'inactivo'; se distinguen para dar el mensaje correcto.
+            boolean pendiente = usuarioRepository.findByCorreoOrNombreUsuario(request.getUsuario(), request.getUsuario())
+                    .map(u -> u.getEstado() == EstadoUsuario.pendiente)
+                    .orElse(false);
+            if (pendiente) {
+                throw new CuentaNoVerificadaException(
+                        "Tu cuenta aún no está activada. Usa el enlace de activación que recibiste por correo.");
+            }
+            throw ex; // inactivo → GlobalExceptionHandler responde 403 "cuenta desactivada"
         }
 
         Usuario usuario = usuarioRepository.findByCorreoOrNombreUsuario(request.getUsuario(), request.getUsuario())
@@ -90,38 +106,45 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public UsuarioResponse registrarEstudiante(RegistroEstudianteRequest request) {
-
-        if (usuarioRepository.existsByCorreo(request.getCorreo())) {
+        String correo = request.getCorreo().trim().toLowerCase();
+        if (usuarioRepository.existsByCorreo(correo)) {
             throw new SolicitudInvalidaException("Ya existe una cuenta registrada con ese correo");
         }
-        if (usuarioRepository.existsByNombreUsuario(request.getNombreUsuario())) {
-            throw new SolicitudInvalidaException("Ese nombre de usuario ya está en uso, elige otro");
+
+        String nombreUsuario;
+        if (request.getNombreUsuario() != null && !request.getNombreUsuario().isBlank()) {
+            nombreUsuario = request.getNombreUsuario().trim();
+            if (usuarioRepository.existsByNombreUsuario(nombreUsuario)) {
+                throw new SolicitudInvalidaException("Ese nombre de usuario ya está en uso, elige otro");
+            }
+        } else {
+            nombreUsuario = generarNombreUsuarioUnico(request.getNombre(), request.getApellido());
         }
 
         Grado grado = gradoRepository.findById(request.getIdGrado())
                 .orElseThrow(() -> new RecursoNoEncontradoException("El grado seleccionado no existe"));
+        if ("inactivo".equalsIgnoreCase(grado.getEstado())) {
+            throw new SolicitudInvalidaException("El grado seleccionado no está disponible");
+        }
         AreaAcademica area = areaAcademicaRepository.findById(request.getIdArea())
                 .orElseThrow(() -> new RecursoNoEncontradoException("El área académica seleccionada no existe"));
+        if ("inactivo".equalsIgnoreCase(area.getEstado())) {
+            throw new SolicitudInvalidaException("El área académica seleccionada no está disponible");
+        }
 
-        // Institución es opcional (estudiante independiente si se deja vacío).
         Institucion institucion = null;
         if (request.getCodigoInstitucion() != null && !request.getCodigoInstitucion().isBlank()) {
-            institucion = institucionRepository.findByCodigoAfiliacionIgnoreCase(request.getCodigoInstitucion().trim())
-                    .orElseThrow(() -> new SolicitudInvalidaException(
-                            "El código de institución no es válido. Verifícalo con tu colegio."));
-            if (!"activa".equalsIgnoreCase(institucion.getEstado())) {
-                throw new SolicitudInvalidaException("Esta institución no está activa en este momento");
-            }
+            institucion = buscarInstitucionDisponible(request.getCodigoInstitucion());
         }
 
         Usuario usuario = Usuario.builder()
                 .nombre(request.getNombre().trim())
                 .apellido(request.getApellido().trim())
-                .nombreUsuario(request.getNombreUsuario().trim())
-                .correo(request.getCorreo().trim().toLowerCase())
+                .nombreUsuario(nombreUsuario)
+                .correo(correo)
                 .contrasena(passwordEncoder.encode(request.getContrasena()))
                 .tipoUsuario(RolUsuario.estudiante)
-                .estado(EstadoUsuario.pendiente) // queda pendiente hasta verificar correo (flujo futuro)
+                .estado(EstadoUsuario.pendiente)
                 .build();
         usuario = usuarioRepository.save(usuario);
 
@@ -134,15 +157,60 @@ public class AuthServiceImpl implements AuthService {
                 .build();
         perfilEstudianteRepository.save(perfil);
 
-        crearTokenVerificacion(usuario);
+        tokenService.crearTokenActivacion(usuario, TokenVerificacionService.HORAS_VERIFICACION_ESTUDIANTE,
+                "activación de cuenta");
 
         return aUsuarioResponse(usuario);
     }
 
     @Override
+    public InstitucionPublicaResponse validarCodigoInstitucion(String codigo) {
+        Institucion institucion = buscarInstitucionDisponible(codigo);
+        return InstitucionPublicaResponse.builder().nombre(institucion.getNombre()).build();
+    }
+
+    /** Código existente + institución activa + cupos disponibles. Usado al validar y al registrar. */
+    private Institucion buscarInstitucionDisponible(String codigo) {
+        Institucion institucion = institucionRepository.findByCodigoAfiliacionIgnoreCase(codigo.trim())
+                .orElseThrow(() -> new SolicitudInvalidaException(
+                        "El código de institución no es válido. Verifícalo con tu colegio."));
+        if (!"activa".equalsIgnoreCase(institucion.getEstado())) {
+            throw new SolicitudInvalidaException("Esta institución no está activa en este momento");
+        }
+        Integer cupos = institucion.getCuposContratados();
+        if (cupos != null) {
+            long usados = perfilEstudianteRepository.countByInstitucion_IdAndEstado(institucion.getId(), EstadoEstudiante.activo);
+            if (usados >= cupos) {
+                throw new SolicitudInvalidaException(
+                        "Tu institución no tiene cupos disponibles en este momento. Comunícate con tu colegio.");
+            }
+        }
+        return institucion;
+    }
+
+    /** nombre.apellido sin tildes ni símbolos; si ya existe, se agregan 3 dígitos aleatorios. */
+    private String generarNombreUsuarioUnico(String nombre, String apellido) {
+        String base = normalizar(nombre) + "." + normalizar(apellido);
+        if (base.length() < 4) base = base + "user";
+        if (base.length() > 50) base = base.substring(0, 50);
+        String candidato = base;
+        int intentos = 0;
+        while (usuarioRepository.existsByNombreUsuario(candidato)) {
+            candidato = base + (100 + RANDOM.nextInt(900));
+            if (++intentos > 20) candidato = base + UUID.randomUUID().toString().substring(0, 6);
+        }
+        return candidato;
+    }
+
+    private static String normalizar(String texto) {
+        String sinTildes = Normalizer.normalize(texto.trim().toLowerCase(), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return sinTildes.replaceAll("[^a-z0-9]", "");
+    }
+
+    @Override
     @Transactional
     public MensajeResponse solicitarRecuperacion(RecuperarPasswordRequest request, String ipSolicitud) {
-        // Por seguridad, siempre respondemos igual exista o no el correo (no revelamos qué correos están registrados).
         var usuarioOpt = usuarioRepository.findByCorreo(request.getCorreo().trim().toLowerCase());
         if (usuarioOpt.isPresent()) {
             Usuario usuario = usuarioOpt.get();
@@ -156,8 +224,6 @@ public class AuthServiceImpl implements AuthService {
                     .build();
             recuperacionRepository.save(recuperacion);
 
-            // TODO: aquí se integraría el envío real de correo. Mientras tanto, se deja en el log
-            // para poder probar el flujo completo desde Swagger sin un servicio de correo real.
             log.info("Token de recuperación de contraseña para {} (expira en {} min): {}",
                     usuario.getCorreo(), MINUTOS_EXPIRACION_RECUPERACION, token);
         }
@@ -195,27 +261,56 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public MensajeResponse verificarCuenta(String token) {
-        VerificacionCuenta verificacion = verificacionRepository.findByToken(token)
-                .orElseThrow(() -> new SolicitudInvalidaException("El enlace de verificación no es válido"));
-
-        if (verificacion.getEstado() != EstadoToken.pendiente) {
-            throw new SolicitudInvalidaException("Esta cuenta ya fue verificada anteriormente");
-        }
-        if (verificacion.getExpiraEn().isBefore(LocalDateTime.now())) {
-            verificacion.setEstado(EstadoToken.expirado);
-            verificacionRepository.save(verificacion);
-            throw new SolicitudInvalidaException("El enlace de verificación expiró. Solicita uno nuevo.");
-        }
-
+        VerificacionCuenta verificacion = tokenService.obtenerValido(token);
         Usuario usuario = verificacion.getUsuario();
+
+        // Un token de invitación de personal no puede usarse aquí: activaría la cuenta sin que la persona
+        // haya definido su contraseña. Ese flujo va por /completar-invitacion.
+        if (usuario.getTipoUsuario() != RolUsuario.estudiante) {
+            throw new SolicitudInvalidaException(
+                    "Este enlace corresponde a una invitación. Actívala definiendo tu contraseña.");
+        }
+
         usuario.setEstado(EstadoUsuario.activo);
         usuarioRepository.save(usuario);
-
-        verificacion.setEstado(EstadoToken.usado);
-        verificacion.setUsadoEn(LocalDateTime.now());
-        verificacionRepository.save(verificacion);
+        tokenService.marcarUsado(verificacion);
 
         return MensajeResponse.builder().mensaje("Tu cuenta quedó verificada. Ya puedes iniciar sesión.").build();
+    }
+
+    @Override
+    @Transactional
+    public MensajeResponse reenviarVerificacion(ReenviarVerificacionRequest request) {
+        usuarioRepository.findByCorreo(request.getCorreo().trim().toLowerCase())
+                .filter(u -> u.getTipoUsuario() == RolUsuario.estudiante && u.getEstado() == EstadoUsuario.pendiente)
+                .ifPresent(u -> tokenService.crearTokenActivacion(u,
+                        TokenVerificacionService.HORAS_VERIFICACION_ESTUDIANTE, "activación de cuenta (reenvío)"));
+
+        // Respuesta idéntica exista o no la cuenta, para no revelar qué correos están registrados.
+        return MensajeResponse.builder()
+                .mensaje("Si hay una cuenta pendiente de activación con ese correo, te enviamos un nuevo enlace.")
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public MensajeResponse completarInvitacion(CompletarInvitacionRequest request) {
+        VerificacionCuenta verificacion = tokenService.obtenerValido(request.getToken());
+        Usuario usuario = verificacion.getUsuario();
+
+        if (usuario.getTipoUsuario() == RolUsuario.estudiante) {
+            throw new SolicitudInvalidaException(
+                    "Este enlace corresponde a la verificación de una cuenta de estudiante, no a una invitación.");
+        }
+
+        usuario.setContrasena(passwordEncoder.encode(request.getContrasena()));
+        usuario.setEstado(EstadoUsuario.activo);
+        usuarioRepository.save(usuario);
+        tokenService.marcarUsado(verificacion);
+
+        return MensajeResponse.builder()
+                .mensaje("Tu cuenta quedó activada con la contraseña definida. Ya puedes iniciar sesión.")
+                .build();
     }
 
     @Override
@@ -223,22 +318,6 @@ public class AuthServiceImpl implements AuthService {
         Usuario usuario = usuarioRepository.findByCorreo(correo)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
         return aUsuarioResponse(usuario);
-    }
-
-    private void crearTokenVerificacion(Usuario usuario) {
-        String token = UUID.randomUUID().toString();
-        VerificacionCuenta verificacion = VerificacionCuenta.builder()
-                .usuario(usuario)
-                .token(token)
-                .tipo(TipoVerificacion.activacion)
-                .estado(EstadoToken.pendiente)
-                .expiraEn(LocalDateTime.now().plusHours(HORAS_EXPIRACION_VERIFICACION))
-                .build();
-        verificacionRepository.save(verificacion);
-
-        // TODO: aquí se integraría el envío real de correo de bienvenida/activación.
-        log.info("Token de verificación de cuenta para {} (expira en {} h): {}",
-                usuario.getCorreo(), HORAS_EXPIRACION_VERIFICACION, token);
     }
 
     private UsuarioResponse aUsuarioResponse(Usuario usuario) {
