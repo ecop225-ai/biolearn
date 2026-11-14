@@ -27,3 +27,7 @@ application.properties
 ### macOS / Windows ###
 .DS_Store
 Thumbs.db
+
+### Archivos subidos a la plataforma (comprobantes de pago, PDF de los cursos): no van al repositorio ###
+uploads/
+.vite/
