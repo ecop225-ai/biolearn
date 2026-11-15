@@ -9,6 +9,7 @@ import co.biolearn.exception.SolicitudInvalidaException;
 import co.biolearn.model.*;
 import co.biolearn.repository.*;
 import co.biolearn.service.ArchivoFirma;
+import co.biolearn.service.CorreoService;
 import co.biolearn.service.PagoService;
 import co.biolearn.service.PasarelaPago;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +60,7 @@ public class PagoServiceImpl implements PagoService {
     private final InscripcionServiceImpl inscripcionService;
     private final PasarelaPago pasarela;
     private final ArchivoFirma archivoFirma;
+    private final CorreoService correoService;
 
     // ── estudiante ──────────────────────────────────────────────────────────
 
@@ -237,6 +239,16 @@ public class PagoServiceImpl implements PagoService {
         return aFactura(f);
     }
 
+    /** El portal oculta Confirmar, Rechazar y Reenviar al auditor (el servidor igual los rechaza con 403). */
+    @Override
+    @Transactional(readOnly = true)
+    public PermisosContadorResponse permisos(Usuario usuario) {
+        PerfilContador c = perfilContadorRepository.findByUsuario_Id(usuario.getId())
+                .orElseThrow(() -> new SinPermisoException("Esta función es exclusiva de los contadores"));
+        boolean puede = c.getEstado() == EstadoPerfil.activo && c.getRolContador() != RolContador.auditor;
+        return PermisosContadorResponse.builder().rolContador(c.getRolContador().name()).puedeResolver(puede).build();
+    }
+
     // ── reglas ──────────────────────────────────────────────────────────────
 
     /** Aprueba el pago: activa las inscripciones, emite la factura, la envía y notifica al estudiante. */
@@ -274,9 +286,20 @@ public class PagoServiceImpl implements PagoService {
         return facturaRepository.save(f);
     }
 
-    /** El proyecto aún no tiene servidor de correo: el envío se registra en el log, como los enlaces de activación. */
+    /** Envía la factura al correo del estudiante (si el correo no está configurado, queda en la consola). */
     private void enviarPorCorreo(Factura f) {
-        log.info("Factura {} enviada por correo a {} ({})", f.getNumero(), f.getEstudiante().getUsuario().getCorreo(), pesos(f.getMontoTotal()));
+        Usuario u = f.getEstudiante().getUsuario();
+        log.info("Factura {} enviada por correo a {} ({})", f.getNumero(), u.getCorreo(), pesos(f.getMontoTotal()));
+        StringBuilder filas = new StringBuilder();
+        f.getPago().getItems().forEach(it -> filas.append("<tr><td style=\"padding:8px;border-bottom:1px solid #E0E2E8\">Inscripción — ")
+                .append(org.springframework.web.util.HtmlUtils.htmlEscape(it.getInscripcion().getCurso().getNombre()))
+                .append("</td><td style=\"padding:8px;border-bottom:1px solid #E0E2E8;text-align:right\">")
+                .append(pesos(it.getMontoAsignado())).append("</td></tr>"));
+        DatosFacturacion d = f.getDatosFacturacion();
+        String pie = (d != null ? org.springframework.web.util.HtmlUtils.htmlEscape(d.getRazonSocial() + " · NIT " + d.getNit()) + " · " : "")
+                + "Medio de pago: " + NOMBRES_MEDIO.getOrDefault(f.getPago().getMedioPago(), f.getPago().getMedioPago())
+                + (f.getPago().getReferenciaExterna() != null ? " · Ref. " + org.springframework.web.util.HtmlUtils.htmlEscape(f.getPago().getReferenciaExterna()) : "");
+        correoService.factura(u.getCorreo(), u.getNombre(), f.getNumero(), filas.toString(), pesos(f.getMontoTotal()), pie);
         f.setEnviadaPorCorreo(true);
         f.setEnviadaEn(LocalDateTime.now());
         facturaRepository.save(f);

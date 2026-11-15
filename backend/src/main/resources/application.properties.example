@@ -25,3 +25,22 @@ biolearn.cors.allowed-origin=http://127.0.0.1:5500
 # --- Swagger / OpenAPI ---
 springdoc.swagger-ui.path=/swagger-ui.html
 springdoc.api-docs.path=/v3/api-docs
+
+# --- Correo (SMTP) ---
+# Sin estos datos el backend no envía correos: los enlaces de activación, invitación y recuperación
+# y las facturas quedan en la consola. Con Gmail se usa una "contraseña de aplicación" (16 letras),
+# no la contraseña normal de la cuenta. NUNCA subas este archivo con la clave real a GitHub.
+biolearn.correo.habilitado=false
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=biolearn.notificaciones@gmail.com
+spring.mail.password=PEGA_AQUI_LA_CONTRASENA_DE_APLICACION
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+spring.mail.properties.mail.smtp.connectiontimeout=10000
+spring.mail.properties.mail.smtp.timeout=10000
+spring.mail.properties.mail.smtp.writetimeout=10000
+# Desarrollo: si se llena, TODOS los correos llegan a este buzón (con el destinatario original en el asunto)
+biolearn.correo.redirigir-a=
+# Pantalla de Auth a la que apuntan los enlaces de los correos
+biolearn.frontend.url-auth=http://127.0.0.1:5173/prototipo-auth/biolearn_auth_prototipo.html

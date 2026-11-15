@@ -125,16 +125,16 @@ function pantallaRecuperarSent() {
     brandHTML() +
     '<div class="icon-circle">✉️</div>' +
     '<h1 class="auth-title-sm">Solicitud enviada</h1>' +
-    '<p class="text-sm muted" style="margin-bottom:24px;line-height:1.6">Si <strong style="color:var(--ink)">' + esc(window._recEmail || 'ese correo') + '</strong> está registrado, el backend generó un token de recuperación. Como el envío real de correos aún no está integrado, cópialo desde la consola de IntelliJ (busca "Token de recuperación...") y pégalo en el siguiente paso.</p>' +
+    '<p class="text-sm muted" style="margin-bottom:24px;line-height:1.6">Si <strong style="color:var(--ink)">' + esc(window._recEmail || 'ese correo') + '</strong> está registrado, te enviamos un correo con el enlace para crear una contraseña nueva. Abre el enlace; si no te llega, revisa la carpeta de spam o usa el token de la consola del backend ("Token de recuperación...") en el siguiente paso.</p>' +
     '<button class="btn btn-primary w-full" onclick="RECOVER_STEP=\'reset\';render()">Ya tengo el token →</button>' +
     '<div style="text-align:center;margin-top:16px"><button class="btn-text" onclick="RECOVER_STEP=\'request\';render()">Solicitar de nuevo</button></div>';
-  return shellHTML(form, sidePanelHTML('Revisa la consola del backend', 'El token expira en 30 minutos por tu seguridad.'));
+  return shellHTML(form, sidePanelHTML('Revisa tu correo', 'El enlace expira en 30 minutos por tu seguridad.'));
 }
 function pantallaRecuperarReset() {
   const form =
     brandHTML() +
     '<h1 class="auth-title-sm">Crear nueva contraseña</h1>' +
-    '<p class="text-sm muted" style="margin-bottom:20px">Pega el token que copiaste de la consola del backend.</p>' +
+    '<p class="text-sm muted" style="margin-bottom:20px">Si abriste el enlace del correo, el token ya está cargado. Si no, pégalo desde el correo o desde la consola del backend.</p>' +
     '<div class="campo"><label for="rec-token">Token de recuperación</label>' + campoIconoHTML('rec-token', '🔑', 'Pega aquí el token') + '</div>' +
     '<div class="campo"><label for="rec-pass">Nueva contraseña</label>' + campoPasswordHTML('rec-pass') + '</div>' +
     '<div class="campo"><label for="rec-confirm">Confirmar contraseña</label>' + campoPasswordHTML('rec-confirm') + '</div>' +
@@ -374,7 +374,7 @@ function pantallaRegistroDone() {
     '<p class="text-sm muted" style="margin-bottom:10px;line-height:1.6">Tu cuenta quedó creada para <strong style="color:var(--ink)">' + esc(window._signupEmail) + '</strong>' +
     (window._signupUsuario ? ' con el nombre de usuario <strong style="color:var(--ink)">' + esc(window._signupUsuario) + '</strong>' : '') + '.' +
     (window._signupInst ? ' Quedaste afiliado a <strong style="color:var(--ink)">' + esc(window._signupInst) + '</strong>.' : '') + '</p>' +
-    '<p class="text-sm muted" style="margin-bottom:10px;line-height:1.6">Antes de iniciar sesión debes <strong style="color:var(--ink)">activarla</strong> con el enlace que te enviamos al correo. Como el envío real de correos aún no está integrado, copia el token desde la consola del backend (busca "Token de activación de cuenta...").</p>' +
+    '<p class="text-sm muted" style="margin-bottom:10px;line-height:1.6">Antes de iniciar sesión debes <strong style="color:var(--ink)">activarla</strong> con el enlace que te enviamos al correo. Abre el enlace y la cuenta se activa sola; si no te llega, revisa la carpeta de spam o usa el token de la consola del backend ("Token de activación de cuenta...").</p>' +
     '<button class="btn btn-primary w-full" style="margin-top:8px" onclick="ACTIVAR.modo=\'estudiante\';ACTIVAR.correo=window._signupEmail;reiniciarSignup();goTo(\'activar\')">Activar mi cuenta →</button>' +
     '<div style="text-align:center;margin-top:14px"><button class="btn-text" onclick="reiniciarSignup();goTo(\'login\')">Ir a iniciar sesión</button></div>';
   return shellHTML(form, sidePanelHTML('¡Bienvenido a BioLearn!', 'Solo falta activar tu cuenta para empezar.'));
@@ -396,8 +396,8 @@ function pantallaActivar() {
     '<button type="button" class="tipo-cuenta-btn' + (esEst?' activo':'') + '" onclick="cambiarModoActivar(\'estudiante\')">🎓<div class="titulo">Me registré como estudiante</div><div class="sub">Confirmo mi correo</div></button>' +
     '<button type="button" class="tipo-cuenta-btn' + (!esEst?' activo':'') + '" onclick="cambiarModoActivar(\'invitacion\')">✉️<div class="titulo">Recibí una invitación</div><div class="sub">Docente, contador o representante</div></button></div>' +
     '<p class="text-sm muted" style="margin-bottom:16px;line-height:1.5">' + (esEst
-      ? 'Pega el token de activación (en la consola del backend: "Token de activación de cuenta..."). Expira en 24 horas.'
-      : 'Pega el token de tu invitación (en la consola del backend: "Token de invitación...") y define tu contraseña. Expira en 7 días.') + '</p>' +
+      ? 'Si abriste el enlace del correo, el token ya está cargado; si no, pégalo desde el correo o desde la consola del backend. Expira en 24 horas.'
+      : 'Si abriste el enlace del correo de invitación, el token ya está cargado; si no, pégalo desde el correo o desde la consola del backend. Define tu contraseña. Expira en 7 días.') + '</p>' +
     '<div class="campo"><label for="act-token">Token</label>' + campoIconoHTML('act-token', '🔑', 'Pega aquí el token', ACTIVAR.token) + '</div>';
   if (esEst) {
     form += '<button class="btn btn-primary w-full" id="act-btn" onclick="verificarCuentaEstudiante()">Activar cuenta</button>' +

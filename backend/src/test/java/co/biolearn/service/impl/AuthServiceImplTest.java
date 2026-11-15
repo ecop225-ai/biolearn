@@ -77,6 +77,8 @@ class AuthServiceImplTest {
     @Mock private AuthenticationManager authenticationManager;
     @Mock private JwtUtil jwtUtil;
 
+    @Mock private co.biolearn.service.CorreoService correoService;
+
     @InjectMocks private AuthServiceImpl authService;
 
     @BeforeEach

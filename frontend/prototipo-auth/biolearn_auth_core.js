@@ -138,9 +138,10 @@ function render() {
 }
 function onCampoInput() { if (typeof actualizarValidacion === 'function') actualizarValidacion(); }
 
-/* Enlaces de correo (cuando se integre el envío real):
+/* Enlaces de los correos que envía el backend (CorreoService):
    ...auth_prototipo.html?verificar=TOKEN   → verifica la cuenta de estudiante automáticamente
-   ...auth_prototipo.html?invitacion=TOKEN  → abre la activación de personal con el token cargado */
+   ...auth_prototipo.html?invitacion=TOKEN  → abre la activación de personal con el token cargado
+   ...auth_prototipo.html?recuperar=TOKEN   → abre «Crear nueva contraseña» con el token cargado */
 document.addEventListener('DOMContentLoaded', function () {
   cargarCatalogosRegistro();
   const params = new URLSearchParams(window.location.search);
@@ -151,6 +152,13 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   if (params.get('invitacion')) {
     SCREEN = 'activar'; ACTIVAR.modo = 'invitacion'; ACTIVAR.token = params.get('invitacion');
+  }
+  if (params.get('recuperar')) {
+    SCREEN = 'recover-request'; RECOVER_STEP = 'reset';
+    render();
+    const campo = document.getElementById('rec-token');
+    if (campo) { campo.value = params.get('recuperar'); campo.dispatchEvent(new Event('input', { bubbles: true })); }
+    return;
   }
   render();
 });

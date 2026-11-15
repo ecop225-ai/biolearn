@@ -172,7 +172,7 @@ async function reenviarInvitacion(id) {
     if (manejarSesionExpirada(response)) return;
     const data = await response.json();
     if (!response.ok) throw new Error(data.mensaje || 'No se pudo reenviar la invitación.');
-    toast(data.mensaje + ' (token en la consola del backend)');
+    toast(data.mensaje + ' (enviamos la invitación a su correo)');
   } catch (err) {
     toast(err.message, true);
   }
@@ -455,7 +455,7 @@ async function guardarUsuario() {
     const response = await fetch(API_BASE + '/api/usuarios', { method: 'POST', headers, body: JSON.stringify(cuerpo) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.mensaje || 'No se pudo crear el usuario.');
-    toast('Usuario ' + nombre + ' creado — revisa la consola del backend para el token de invitación');
+    toast('Usuario ' + nombre + ' creado — le enviamos la invitación a su correo');
     cerrarModal('modal-usuario');
     cargarUsuarios();
   } catch (err) {

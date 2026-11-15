@@ -4,7 +4,8 @@
    del prototipo del contador (las demás siguen con datos de demostración):
    - Pagos: filtros por estado, medio, búsqueda y fechas. Las transferencias con comprobante se
      confirman (activa los cursos y emite la factura) o se rechazan con un motivo. Los pagos en
-     línea los resuelve la pasarela. El contador auditor solo consulta (el servidor responde 403).
+     línea los resuelve la pasarela. El contador auditor solo consulta: no ve Confirmar, Rechazar ni
+     Reenviar (GET /api/pagos/permisos) y, si llamara la API, el servidor responde 403.
    - Facturas: búsqueda y fechas, vista imprimible y reenvío al correo del estudiante. Ya no hay
      «Emitir factura manual»: cada factura nace de un pago aprobado.
    Se carga al final de biolearn_contador_prototipo.html.
@@ -14,8 +15,32 @@ let CP_FILTRO = { estado: 'pendiente', medio: '', busqueda: '', desde: '', hasta
 let CP_PAGOS = [];
 let CF_FILTRO = { busqueda: '', desde: '', hasta: '' };
 let CF_FACTURAS = [];
+let CONT_PUEDE_RESOLVER = null;   // false para el contador auditor: no ve Confirmar, Rechazar ni Reenviar
 
 /* ---------------------------------------------------------------- sesión y comunicación */
+/* Nombre real del contador que inició sesión (el prototipo traía «Camila Ortiz» fijo). CONTADOR es un
+   objeto de biolearn_contador_core.js: se actualizan sus datos al cargar, antes del primer render. */
+(function () {
+  try {
+    const u = JSON.parse(sessionStorage.getItem('biolearn_usuario') || 'null');
+    if (u) {
+      CONTADOR.nombre = ((u.nombre || '') + ' ' + (u.apellido || '')).trim() || 'Contador';
+      CONTADOR.cargo = 'Contador';
+      CONTADOR.email = u.correo || '';
+    }
+  } catch (e) { /* sin sesión: se conserva el dato de demostración */ }
+})();
+
+/* Cerrar sesión de verdad: borra el token y vuelve al inicio de sesión (reemplaza la versión del prototipo). */
+function confirmarCerrarSesion() {
+  confirmarAccion('¿Cerrar sesión? Volverás a la pantalla de inicio de sesión.', function () {
+    sessionStorage.removeItem('biolearn_token');
+    sessionStorage.removeItem('biolearn_usuario');
+    toast('Sesión cerrada');
+    setTimeout(function () { window.location.href = '../prototipo-auth/biolearn_auth_prototipo.html'; }, 500);
+  }, 'Cerrar sesión');
+}
+
 document.addEventListener('DOMContentLoaded', function () {
   let u = null;
   try { u = JSON.parse(sessionStorage.getItem('biolearn_usuario') || 'null'); } catch (e) { u = null; }
@@ -24,7 +49,9 @@ document.addEventListener('DOMContentLoaded', function () {
     document.body.innerHTML = '<div id="acceso-denegado" style="max-width:480px;margin:12vh auto;padding:32px;background:#fff;border-radius:16px;box-shadow:0 8px 24px rgba(27,50,44,.15);text-align:center">' +
       '<div style="font-size:40px">🔒</div><h2 style="margin:12px 0 8px">Acceso solo para contadores</h2><p style="color:#555">Tu cuenta (' + esc(u.nombre || '') + ', rol ' + esc(u.rol || '') + ') no tiene acceso a este portal.</p></div>';
     setTimeout(() => { window.location.href = '../prototipo-auth/biolearn_auth_prototipo.html'; }, 2500);
+    return;
   }
+  cargarPermisosCont();   // muestra en el menú el cargo real (Administrador financiero, Auxiliar contable o Auditor)
 });
 
 async function pedirApiCont(metodo, ruta, cuerpo) {
@@ -52,6 +79,22 @@ function pillPagoCont(e) {
   return '<span class="pill ' + clase + '">' + esc(ESTADO_PAGO_CONT[e] || e) + '</span>';
 }
 
+/* El auditor solo consulta: se pregunta una vez al servidor qué puede hacer este contador. */
+const CARGO_CONTADOR = { administrador_financiero: 'Administrador financiero', auxiliar: 'Auxiliar contable', auditor: 'Auditor' };
+async function cargarPermisosCont() {
+  if (CONT_PUEDE_RESOLVER !== null) return;
+  try {
+    const p = await pedirApiCont('GET', '/api/pagos/permisos');
+    // Si la consulta responde sin el campo, se muestran los botones: el servidor igual rechaza al auditor con 403.
+    CONT_PUEDE_RESOLVER = p.puedeResolver !== false;
+    if (CARGO_CONTADOR[p.rolContador]) { CONTADOR.cargo = CARGO_CONTADOR[p.rolContador]; renderSidebar(); }
+    return;
+  } catch (e) { CONT_PUEDE_RESOLVER = true; return; }
+}
+function avisoAuditorCont() {
+  return CONT_PUEDE_RESOLVER === false ? '<div id="cont-aviso-auditor" class="card mb-14" style="border-left:4px solid var(--blue);padding:12px 16px"><strong>Rol auditor:</strong> puedes consultar pagos y facturas, pero no confirmarlos, rechazarlos ni reenviarlos.</div>' : '';
+}
+
 /* ================================================================ PAGOS */
 function renderPagos(cont) {
   let html = '<div class="section-header"><div><h2>Pagos</h2><p class="subtitle">Confirma las transferencias de los estudiantes; los pagos en línea los resuelve la pasarela</p></div></div>';
@@ -75,6 +118,7 @@ function renderPagos(cont) {
 
 async function cargarPagosCont() {
   try {
+    await cargarPermisosCont();
     const [lista, pendientes] = await Promise.all([
       pedirApiCont('GET', '/api/pagos' + qs(CP_FILTRO)),
       pedirApiCont('GET', '/api/pagos?estado=pendiente&medio=transferencia'),
@@ -103,8 +147,9 @@ function pintarPagosCont() {
   CP_PAGOS.forEach(p => {
     let acc = '';
     if (p.comprobanteUrl) acc += '<button class="btn btn-ghost btn-xs" onclick="window.open(\'' + esc(urlCont(p.comprobanteUrl)) + '\',\'_blank\')">📎 Comprobante</button>';
-    if (p.estado === 'pendiente' && !p.enLinea && p.comprobanteUrl) acc += '<button class="btn btn-sm cp-confirmar" style="background:var(--sage);color:#fff" onclick="abrirConfirmarPagoCont(' + p.id + ')">✓ Confirmar</button><button class="btn btn-danger btn-xs cp-rechazar" onclick="abrirRechazoPagoCont(' + p.id + ')">✕ Rechazar</button>';
-    if (p.estado === 'pendiente' && !p.enLinea && !p.comprobanteUrl) acc += '<span class="text-sm muted">Sin comprobante</span><button class="btn btn-danger btn-xs cp-rechazar" onclick="abrirRechazoPagoCont(' + p.id + ')">✕ Rechazar</button>';
+    if (p.estado === 'pendiente' && !p.enLinea && !CONT_PUEDE_RESOLVER) acc += '<span class="text-sm muted">' + (p.comprobanteUrl ? 'Por confirmar' : 'Sin comprobante') + '</span>';
+    else if (p.estado === 'pendiente' && !p.enLinea && p.comprobanteUrl) acc += '<button class="btn btn-sm cp-confirmar" style="background:var(--sage);color:#fff" onclick="abrirConfirmarPagoCont(' + p.id + ')">✓ Confirmar</button><button class="btn btn-danger btn-xs cp-rechazar" onclick="abrirRechazoPagoCont(' + p.id + ')">✕ Rechazar</button>';
+    else if (p.estado === 'pendiente' && !p.enLinea && !p.comprobanteUrl) acc += '<span class="text-sm muted">Sin comprobante</span><button class="btn btn-danger btn-xs cp-rechazar" onclick="abrirRechazoPagoCont(' + p.id + ')">✕ Rechazar</button>';
     if (p.estado === 'pendiente' && p.enLinea) acc += '<span class="text-sm muted">En la pasarela</span>';
     if (p.numeroFactura) acc += '<button class="btn btn-ghost btn-xs" onclick="verFacturaCont(' + p.idFactura + ')">' + esc(p.numeroFactura) + '</button>';
     html += '<tr class="cp-fila" data-id="' + p.id + '" data-estado="' + p.estado + '" data-correo="' + esc(p.correo) + '"' + (p.estado === 'rechazado' ? ' style="background:var(--clay-soft)"' : '') + '>' +
@@ -116,7 +161,7 @@ function pintarPagosCont() {
       '<td><div class="flex gap-6 flex-wrap">' + acc + '</div></td></tr>';
   });
   if (!CP_PAGOS.length) html += '<tr><td colspan="7" class="empty-state">No hay pagos con estos filtros.</td></tr>';
-  el.innerHTML = html + '</tbody></table></div>';
+  el.innerHTML = avisoAuditorCont() + html + '</tbody></table></div>';
 }
 
 function pagoCont(id) { return CP_PAGOS.find(x => x.id === id); }
@@ -175,6 +220,7 @@ function renderFacturas(cont) {
 async function cargarFacturasCont() {
   const el = document.getElementById('cf-lista');
   try {
+    await cargarPermisosCont();
     CF_FACTURAS = await pedirApiCont('GET', '/api/facturas' + qs(CF_FILTRO));
     let html = '<div class="tabla-wrap"><table id="cf-tabla"><thead><tr style="background:var(--blue-soft)">' +
       ['N.º factura', 'Estudiante', 'Emisión', 'Total', 'Medio', 'Correo', 'Acciones'].map(h => '<th style="color:var(--blue-deep)">' + h + '</th>').join('') + '</tr></thead><tbody>';
@@ -185,10 +231,10 @@ async function cargarFacturasCont() {
         '<td class="text-sm">' + esc(f.medioNombre) + '</td>' +
         '<td>' + (f.enviadaPorCorreo ? '<span class="pill pill-verde">✓ Enviada</span><div class="text-sm muted">' + fechaHoraCont(f.enviadaEn) + '</div>' : '<span class="pill pill-gris">No enviada</span>') + '</td>' +
         '<td><div class="flex gap-4"><button class="btn btn-ghost btn-xs" onclick="verFacturaCont(' + f.id + ')">Ver</button>' +
-        '<button class="btn btn-ghost btn-xs cf-reenviar" onclick="reenviarFacturaCont(' + f.id + ')">✉ Reenviar</button></div></td></tr>';
+        (CONT_PUEDE_RESOLVER ? '<button class="btn btn-ghost btn-xs cf-reenviar" onclick="reenviarFacturaCont(' + f.id + ')">✉ Reenviar</button>' : '') + '</div></td></tr>';
     });
     if (!CF_FACTURAS.length) html += '<tr><td colspan="7" class="empty-state">No hay facturas con estos filtros.</td></tr>';
-    el.innerHTML = html + '</tbody></table></div>';
+    el.innerHTML = avisoAuditorCont() + html + '</tbody></table></div>';
   } catch (err) { if (el) el.innerHTML = '<div class="empty-state">' + esc(err.message) + '</div>'; }
 }
 

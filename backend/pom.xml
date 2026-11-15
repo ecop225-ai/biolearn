@@ -38,6 +38,12 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- Envío de correos por SMTP (activación, invitación, recuperación y facturas) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Persistencia -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

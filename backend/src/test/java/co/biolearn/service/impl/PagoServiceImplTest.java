@@ -47,6 +47,8 @@ class PagoServiceImplTest {
     @Mock private PasarelaPago pasarela;
     @Mock private ArchivoFirma archivoFirma;
 
+    @Mock private co.biolearn.service.CorreoService correoService;
+
     @InjectMocks private PagoServiceImpl servicio;
 
     private Usuario estU, otroU, contU, auditorU;
@@ -188,6 +190,7 @@ class PagoServiceImplTest {
             assertThat(facturas.get(0).getDatosFacturacion().getNit()).isEqualTo("901000000-0");
             assertThat(facturas.get(0).getMontoTotal()).isEqualByComparingTo("95000");
             verify(notificacionRepository).save(argThat(n -> "pago".equals(n.getTipo()) && n.getTitulo().equals("Pago aprobado") && n.getEntidadId().equals(id)));
+            verify(correoService).factura(eq("30@t.co"), eq("N30"), startsWith("BIO-FAC-"), contains("Curso 11"), eq("$95.000"), contains("901000000-0"));
         }
 
         @Test @DisplayName("El consecutivo continúa desde el último número del año")
@@ -322,6 +325,15 @@ class PagoServiceImplTest {
             assertThatThrownBy(() -> servicio.miFactura(idFactura, otroU)).isInstanceOf(SinPermisoException.class).hasMessage("Esta factura no es tuya");
             assertThat(servicio.enviarFactura(idFactura, contU).getEnviadaPorCorreo()).isTrue();
             assertThatThrownBy(() -> servicio.enviarFactura(idFactura, auditorU)).isInstanceOf(SinPermisoException.class);
+        }
+
+        @Test @DisplayName("Permisos: el auxiliar resuelve pagos; el auditor solo consulta; un estudiante → 403")
+        void permisos() {
+            assertThat(servicio.permisos(contU).getPuedeResolver()).isTrue();
+            PermisosContadorResponse au = servicio.permisos(auditorU);
+            assertThat(au.getRolContador()).isEqualTo("auditor");
+            assertThat(au.getPuedeResolver()).isFalse();
+            assertThatThrownBy(() -> servicio.permisos(estU)).isInstanceOf(SinPermisoException.class);
         }
 
         @Test @DisplayName("Formato de pesos colombianos en los mensajes")

@@ -28,6 +28,7 @@ public class TokenVerificacionService {
     public static final int HORAS_INVITACION_PERSONAL = 168; // 7 días
 
     private final VerificacionCuentaRepository verificacionRepository;
+    private final CorreoService correoService;
 
     /** Crea un token nuevo de activación. Invalida antes los pendientes del mismo usuario,
      *  para que al reenviar solo el enlace más reciente sea válido. */
@@ -43,9 +44,16 @@ public class TokenVerificacionService {
                 .build();
         verificacionRepository.save(verificacion);
 
-        // Mientras no haya envío real de correos, el token se consulta en la consola del backend.
+        // El token también queda en la consola del backend (útil en desarrollo y si el correo no está configurado).
         log.info("Token de {} para {} (expira en {} h): {}",
                 etiquetaLog, usuario.getCorreo(), horasExpiracion, verificacion.getToken());
+        // Envío real del enlace (si el correo está configurado; si no, queda solo el log de arriba)
+        if (usuario.getTipoUsuario() == co.biolearn.enums.RolUsuario.estudiante) {
+            correoService.activacionEstudiante(usuario.getCorreo(), usuario.getNombre(), verificacion.getToken(), horasExpiracion);
+        } else {
+            correoService.invitacionPersonal(usuario.getCorreo(), usuario.getNombre(),
+                    String.valueOf(usuario.getTipoUsuario()), verificacion.getToken(), horasExpiracion);
+        }
         return verificacion;
     }
 

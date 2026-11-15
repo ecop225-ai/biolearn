@@ -29,7 +29,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * Cada caso prepara por la API un curso con precio «Curso Selenium P<marca>» y la inscripción pendiente de pago del
  * estudiante. Requiere backend y frontend en ejecución y las cuentas de Administrador, docente y estudiante de
  * pruebas; los casos del contador necesitan además una cuenta de contador administrador financiero o auxiliar
- * (biolearn.contador.usuario / biolearn.contador.clave; por defecto contador.pruebas@biolearn.co / Contador2026).
+ * (biolearn.contador.usuario / biolearn.contador.clave; por defecto contador.pruebas@biolearn.co / Contador2026) y, para
+ * CP-PG11, una de contador auditor (biolearn.auditor.usuario / biolearn.auditor.clave; por defecto auditor.pruebas@biolearn.co).
  * Si una cuenta no existe, sus casos se omiten.
  */
 @Tag("e2e")
@@ -50,6 +51,8 @@ class PagoSeleniumTest {
     private static final String ADMIN_CLAVE = System.getProperty("biolearn.admin.clave", "Admin2026");
     private static final String CONTADOR_USUARIO = System.getProperty("biolearn.contador.usuario", "contador.pruebas@biolearn.co");
     private static final String CONTADOR_CLAVE = System.getProperty("biolearn.contador.clave", "Contador2026");
+    private static final String AUDITOR_USUARIO = System.getProperty("biolearn.auditor.usuario", "auditor.pruebas@biolearn.co");
+    private static final String AUDITOR_CLAVE = System.getProperty("biolearn.auditor.clave", "Contador2026");
     private static final boolean SIN_VENTANA = Boolean.parseBoolean(System.getProperty("biolearn.headless", "false"));
 
     private static final Path CARPETA_CAPTURAS = Paths.get("target", "capturas-selenium");
@@ -251,6 +254,39 @@ class PagoSeleniumTest {
         capturar("CP-PG10_acceso_denegado");
     }
 
+    @Test @Order(11)
+    @DisplayName("CP-PG11: el contador auditor consulta los pagos pero no ve Confirmar, Rechazar ni Reenviar")
+    void cpPG11_auditor() {
+        String curso = prepararCursoPendiente();
+        entrarComoEstudiante();
+        transferirConComprobante(curso);
+        cerrarSesionNavegador();
+        entrarComoContador(AUDITOR_USUARIO, AUDITOR_CLAVE);
+        WebElement fila = filaContador(curso);
+        assertThat(texto("cont-aviso-auditor")).contains("Rol auditor");
+        assertThat(fila.findElements(By.cssSelector(".cp-confirmar, .cp-rechazar"))).isEmpty();
+        assertThat(fila.getText()).contains("Por confirmar");
+        capturar("CP-PG11a_auditor_pagos");
+        clicCentrado(espera.until(ExpectedConditions.elementToBeClickable(By.xpath("//button[contains(@class,'sb-item')][.//span[normalize-space()='Facturas']]"))));
+        espera.until(ExpectedConditions.visibilityOfElementLocated(By.id("cf-tabla")));
+        assertThat(driver.findElements(By.cssSelector(".cf-reenviar"))).isEmpty();
+        capturar("CP-PG11b_auditor_facturas");
+    }
+
+    @Test @Order(12)
+    @DisplayName("CP-PG12: cerrar sesión en el portal del contador vuelve al inicio de sesión y muestra su nombre real")
+    void cpPG12_sesionContador() {
+        entrarComoContador();
+        String nombre = String.valueOf(((JavascriptExecutor) driver).executeScript(
+                "const u = JSON.parse(sessionStorage.getItem('biolearn_usuario')); return (u.nombre + ' ' + (u.apellido || '')).trim();"));
+        assertThat(driver.findElement(By.cssSelector(".sb-user-info .nombre")).getText()).isEqualTo(nombre);
+        clicCentrado(driver.findElement(By.xpath("//button[contains(@class,'sb-item')][.//span[normalize-space()='Cerrar sesión']]")));
+        clicSeguro(espera.until(ExpectedConditions.elementToBeClickable(By.id("confirm-btn"))));
+        espera.until(ExpectedConditions.urlContains("biolearn_auth_prototipo.html"));
+        assertThat(((JavascriptExecutor) driver).executeScript("return sessionStorage.getItem('biolearn_token');")).isNull();
+        capturar("CP-PG12_sesion_cerrada");
+    }
+
     // ------------------------------------------------------------------ preparación por la API
 
     /** El docente crea el curso con una lección y un material; el Administrador fija el precio y lo publica; el estudiante se inscribe (pendiente de pago). */
@@ -303,7 +339,9 @@ class PagoSeleniumTest {
     }
 
     /** Inicia la sesión del contador por la API y abre su portal (no depende de la redirección del login). */
-    private void entrarComoContador() {
+    private void entrarComoContador() { entrarComoContador(CONTADOR_USUARIO, CONTADOR_CLAVE); }
+
+    private void entrarComoContador(String usuario, String clave) {
         driver.get(URL_AUTH);
         Object r = ((JavascriptExecutor) driver).executeAsyncScript(
             "const [api, u, c] = arguments; const listo = arguments[arguments.length - 1];" +
@@ -311,8 +349,8 @@ class PagoSeleniumTest {
             ".then(x => x.ok ? x.json() : Promise.reject(x.status))" +
             ".then(d => { sessionStorage.setItem('biolearn_token', d.token); sessionStorage.setItem('biolearn_usuario', JSON.stringify(d.usuario)); listo('OK'); })" +
             ".catch(e => listo('SIN_CONTADOR ' + e));",
-            URL_API, CONTADOR_USUARIO, CONTADOR_CLAVE);
-        assumeTrue("OK".equals(String.valueOf(r)), "Se necesita la cuenta de contador de pruebas (" + CONTADOR_USUARIO + "): " + r);
+            URL_API, usuario, clave);
+        assumeTrue("OK".equals(String.valueOf(r)), "Se necesita la cuenta de contador de pruebas (" + usuario + "): " + r);
         driver.get(URL_CONTADOR);
         espera.until(ExpectedConditions.titleIs("BioLearn — Contador"));
         clicCentrado(espera.until(ExpectedConditions.elementToBeClickable(By.xpath("//button[contains(@class,'sb-item')][.//span[normalize-space()='Pagos']]"))));
@@ -381,8 +419,9 @@ class PagoSeleniumTest {
         } catch (IOException e) { throw new IllegalStateException(e); }
     }
 
+    /** Espera a que la ventana esté abierta (se abre cuando responde la API) y la cierra. */
     private void cerrarModal(String id) {
-        driver.findElement(By.cssSelector("#" + id + " .modal-close")).click();
+        espera.until(ExpectedConditions.elementToBeClickable(By.cssSelector("#" + id + ".open .modal-close"))).click();
         espera.until(ExpectedConditions.invisibilityOfElementLocated(By.cssSelector("#" + id + ".open")));
     }
 
@@ -401,6 +440,10 @@ class PagoSeleniumTest {
 
     private WebElement tarjetaMiCurso(String nombre) {
         return espera.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id='est-mis-cursos']//div[contains(@class,'est-mi-curso')][@data-nombre='" + nombre + "']")));
+    }
+
+    private String texto(String id) {
+        return espera.until(ExpectedConditions.visibilityOfElementLocated(By.id(id))).getText().trim();
     }
 
     private static String marcaCorta() {

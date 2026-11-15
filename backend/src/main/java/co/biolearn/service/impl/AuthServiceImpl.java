@@ -34,6 +34,7 @@ import co.biolearn.repository.UsuarioRepository;
 import co.biolearn.security.CustomUserDetails;
 import co.biolearn.security.JwtUtil;
 import co.biolearn.service.AuthService;
+import co.biolearn.service.CorreoService;
 import co.biolearn.service.TokenVerificacionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +63,7 @@ public class AuthServiceImpl implements AuthService {
     private final AreaAcademicaRepository areaAcademicaRepository;
     private final RecuperacionContrasenaRepository recuperacionRepository;
     private final TokenVerificacionService tokenService;
+    private final CorreoService correoService;
 
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
@@ -226,6 +228,7 @@ public class AuthServiceImpl implements AuthService {
 
             log.info("Token de recuperación de contraseña para {} (expira en {} min): {}",
                     usuario.getCorreo(), MINUTOS_EXPIRACION_RECUPERACION, token);
+            correoService.recuperacion(usuario.getCorreo(), usuario.getNombre(), token, MINUTOS_EXPIRACION_RECUPERACION);
         }
         return MensajeResponse.builder()
                 .mensaje("Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.")

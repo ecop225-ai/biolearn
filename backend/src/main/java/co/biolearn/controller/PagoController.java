@@ -2,6 +2,7 @@ package co.biolearn.controller;
 
 import co.biolearn.dto.FacturaResponse;
 import co.biolearn.dto.PagoResponse;
+import co.biolearn.dto.PermisosContadorResponse;
 import co.biolearn.dto.RechazoPagoRequest;
 import co.biolearn.security.CustomUserDetails;
 import co.biolearn.service.PagoService;
@@ -41,6 +42,13 @@ public class PagoController {
                                                     @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
                                                     @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
         return ResponseEntity.ok(servicio.pagos(estado, medio, busqueda, desde, hasta));
+    }
+
+    @GetMapping("/pagos/permisos")
+    @PreAuthorize("hasRole('CONTADOR')")
+    @Operation(summary = "Rol del contador que inició sesión y si puede confirmar, rechazar y reenviar (el auditor solo consulta)")
+    public ResponseEntity<PermisosContadorResponse> permisos(@AuthenticationPrincipal CustomUserDetails u) {
+        return ResponseEntity.ok(servicio.permisos(u.getUsuario()));
     }
 
     @GetMapping("/pagos/{id}")

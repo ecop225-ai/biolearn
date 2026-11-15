@@ -23,6 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,6 +34,8 @@ import static org.mockito.Mockito.when;
 class TokenVerificacionServiceTest {
 
     @Mock private VerificacionCuentaRepository verificacionRepository;
+    @Mock private co.biolearn.service.CorreoService correoService;
+
     @InjectMocks private TokenVerificacionService tokenService;
 
     private Usuario usuario() {
@@ -54,6 +57,16 @@ class TokenVerificacionServiceTest {
         ArgumentCaptor<VerificacionCuenta> guardados = ArgumentCaptor.forClass(VerificacionCuenta.class);
         verify(verificacionRepository, atLeastOnce()).save(guardados.capture());
         assertThat(guardados.getAllValues()).contains(anterior, nuevo);
+    }
+
+    @Test
+    @DisplayName("Correo: al estudiante le llega el enlace de activación y al personal el de invitación")
+    void enviaCorreo() {
+        VerificacionCuenta v = tokenService.crearTokenActivacion(usuario(), 24, "prueba");
+        verify(correoService).activacionEstudiante(eq("sofia@test.com"), any(), eq(v.getToken()), eq(24));
+        Usuario docente = Usuario.builder().id(11).nombre("Ana").correo("ana@test.com").tipoUsuario(RolUsuario.docente).build();
+        VerificacionCuenta inv = tokenService.crearTokenActivacion(docente, 168, "invitación");
+        verify(correoService).invitacionPersonal("ana@test.com", "Ana", "docente", inv.getToken(), 168);
     }
 
     @Test

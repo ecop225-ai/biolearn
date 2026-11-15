@@ -27,4 +27,5 @@ public interface PagoService {
     List<FacturaResponse> facturas(String busqueda, LocalDate desde, LocalDate hasta);
     FacturaResponse factura(Integer idFactura);
     FacturaResponse enviarFactura(Integer idFactura, Usuario contador);
+    PermisosContadorResponse permisos(Usuario contador);
 }
