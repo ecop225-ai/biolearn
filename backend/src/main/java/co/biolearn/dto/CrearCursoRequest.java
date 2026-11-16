@@ -43,4 +43,7 @@ public class CrearCursoRequest {
 
     /** Id de USUARIO del docente titular (el mismo que muestra la Gestión de usuarios). Opcional al crear. */
     private Integer idDocenteTitular;
+
+    /** Solo para colegios: fuera del catálogo abierto; se inscribe con el código del colegio. */
+    private Boolean soloInstitucional;
 }

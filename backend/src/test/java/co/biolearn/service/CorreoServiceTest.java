@@ -55,4 +55,14 @@ class CorreoServiceTest {
         assertThat(CorreoService.plantilla("<b>Ana</b>", "<p>x</p>", "Ir", "http://x", "nota"))
                 .contains("&lt;b&gt;Ana&lt;/b&gt;").contains("<p>x</p>").contains("href=\"http://x\"");
     }
+
+    @Test @DisplayName("Nota crédito (Fase 2): asunto con el número, la factura que corrige y el total a devolver")
+    void notaCredito() throws Exception {
+        servicio(true, "").notaCredito("a@b.co", "Ana", "BIO-NC-2026-000001", "BIO-FAC-2026-000030",
+                "<tr><td>Ecología general</td><td>$85.000</td></tr>", "$85.000", "Devolución: tu Tarjeta");
+        ArgumentCaptor<MimeMessage> m = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(sender, timeout(3000)).send(m.capture());
+        assertThat(m.getValue().getSubject()).isEqualTo("Nota crédito BIO-NC-2026-000001 · BioLearn");
+        assertThat(String.valueOf(m.getValue().getContent())).contains("BIO-FAC-2026-000030").contains("Total a devolver").contains("Ecología general");
+    }
 }

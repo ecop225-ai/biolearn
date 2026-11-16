@@ -705,6 +705,19 @@ class CursoServiceImplTest {
         }
 
         @Test
+        @DisplayName("Catálogo público: los cursos «solo para colegios» no se ofrecen (ni en el detalle)")
+        void catalogoSinCursosInstitucionales() {
+            Curso abierto = cursoListo("activo");
+            Curso institucional = cursoListo("activo");
+            institucional.setId(77);
+            institucional.setSoloInstitucional(true);
+            when(cursoRepository.findByEstadoOrderByNombreAsc("activo")).thenReturn(List.of(abierto, institucional));
+            assertThat(cursoService.catalogo(null, null, null)).hasSize(1);
+            when(cursoRepository.findById(77)).thenReturn(Optional.of(institucional));
+            assertThatThrownBy(() -> cursoService.detalleCatalogo(77)).isInstanceOf(RecursoNoEncontradoException.class);
+        }
+
+        @Test
         @DisplayName("Detalle público de un curso en borrador → 404")
         void detallePublicoBorrador() {
             when(cursoRepository.findById(10)).thenReturn(Optional.of(curso("borrador")));

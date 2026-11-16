@@ -9,7 +9,7 @@
 --   Grados        → "Grado Selenium …"                         (InstitucionesCatalogosSeleniumTest)
 --   Áreas         → "Área Selenium …"                          (InstitucionesCatalogosSeleniumTest)
 --   Cursos        → "Curso Selenium …"                         (CursosSeleniumTest, EstudianteSeleniumTest y PagoSeleniumTest,
---                   con sus inscripciones, pagos y facturas)
+--                   con sus inscripciones, pagos, facturas, reembolsos y notas crédito)
 --
 -- Uso en MySQL Workbench:
 --   1. Ejecuta la PARTE 1 (vista previa) y revisa qué se va a borrar.
@@ -62,6 +62,10 @@ CREATE TEMPORARY TABLE tmp_pagos_prueba AS
   SELECT DISTINCT pi.id_pago FROM pago_inscripcion pi
   JOIN inscripcion i ON i.id_inscripcion = pi.id_inscripcion
   JOIN curso c ON c.id_curso = i.id_curso WHERE c.nombre LIKE 'Curso Selenium %';
+-- Pagos, Fase 2: notas crédito, notificaciones y reembolsos de esos pagos (antes que las facturas)
+DELETE FROM nota_credito     WHERE id_reembolso IN (SELECT id_reembolso FROM reembolso WHERE id_pago IN (SELECT id_pago FROM tmp_pagos_prueba));
+DELETE FROM notificacion     WHERE tipo = 'reembolso' AND entidad_id IN (SELECT id_reembolso FROM reembolso WHERE id_pago IN (SELECT id_pago FROM tmp_pagos_prueba));
+DELETE FROM reembolso        WHERE id_pago IN (SELECT id_pago FROM tmp_pagos_prueba);   -- borra en cascada reembolso_inscripcion
 DELETE FROM factura          WHERE id_pago IN (SELECT id_pago FROM tmp_pagos_prueba);
 DELETE FROM notificacion     WHERE tipo = 'pago' AND entidad_id IN (SELECT id_pago FROM tmp_pagos_prueba);
 DELETE FROM pago_inscripcion WHERE id_pago IN (SELECT id_pago FROM tmp_pagos_prueba);

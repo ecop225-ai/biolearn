@@ -193,6 +193,11 @@ public class ContenidoCursoServiceImpl implements ContenidoCursoService {
         if ("activa".equals(nuevo) && materialRepository.countByLeccion_IdAndEstado(idLeccion, "activo") == 0) {
             throw new SolicitudInvalidaException("La lección no se puede activar sin al menos un material activo");
         }
+        if ("activa".equals(actual) && "activo".equals(leccion.getCurso().getEstado())
+                && leccionRepository.countByCurso_IdAndEstado(leccion.getCurso().getId(), "activa") <= 1) {
+            // un curso publicado nunca se queda sin lecciones: los estudiantes podrían inscribirse a un curso vacío
+            throw new SolicitudInvalidaException("Es la única lección activa de un curso publicado; activa otra lección antes o pide al Administrador cerrar el curso");
+        }
         if ("archivada".equals(nuevo) && leccionRepository.existsByPrerequisito_IdAndEstado(idLeccion, "activa")) {
             throw new SolicitudInvalidaException("No se puede archivar: es prerrequisito de una lección activa");
         }

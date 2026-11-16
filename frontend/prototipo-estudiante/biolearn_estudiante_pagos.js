@@ -49,7 +49,8 @@ async function confirmarPagoEst() {
 function renderPagos(cont) {
   cont.innerHTML = '<div class="section-header"><div><h2>Mis pagos</h2><p class="subtitle">Paga tus cursos y consulta tus facturas</p></div></div>' +
     '<div id="pag-por-pagar"><div class="empty-state">Cargando...</div></div>' +
-    '<h3 style="font-size:17px;margin:26px 0 12px">Historial de pagos</h3><div id="pag-historial"><div class="empty-state">Cargando...</div></div>';
+    '<h3 style="font-size:17px;margin:26px 0 12px">Historial de pagos</h3><div id="pag-historial"><div class="empty-state">Cargando...</div></div>' +
+    '<h3 style="font-size:17px;margin:26px 0 12px">Mis reembolsos</h3><div id="ree-lista"><div class="empty-state">Cargando...</div></div>';
   renderModalesPagoEst();
   cargarPagosEst();
 }
@@ -60,6 +61,7 @@ async function cargarPagosEst() {
     PAG_CARRITO = carrito; PAG_LISTA = pagos;
     carrito.items.forEach(i => { if (PAG_SELECCION[i.idInscripcion] === undefined) PAG_SELECCION[i.idInscripcion] = true; });
     pintarPorPagarEst(); pintarHistorialEst();
+    if (typeof cargarReembolsosEst === 'function') cargarReembolsosEst();
   } catch (err) {
     const el = document.getElementById('pag-por-pagar'); if (el) el.innerHTML = '<div class="empty-state">' + esc(err.message) + '</div>';
   }
@@ -190,7 +192,8 @@ function pintarHistorialEst() {
   let html = '<div class="tabla-wrap"><table id="pag-tabla"><thead><tr><th>Fecha</th><th>Cursos</th><th>Medio</th><th>Monto</th><th>Estado</th><th></th></tr></thead><tbody>';
   PAG_LISTA.forEach(p => {
     let acciones = '';
-    if (p.estado === 'aprobado' && p.idFactura) acciones += '<button class="btn btn-ghost btn-xs" onclick="verFacturaEst(' + p.idFactura + ')">⬇ ' + esc(p.numeroFactura) + '</button>';
+    if ((p.estado === 'aprobado' || p.estado === 'reembolsado') && p.idFactura) acciones += '<button class="btn btn-ghost btn-xs" onclick="verFacturaEst(' + p.idFactura + ')">⬇ ' + esc(p.numeroFactura) + '</button>';
+    if (p.estado === 'aprobado' && typeof reembolsoEnPlazoEst === 'function' && reembolsoEnPlazoEst(p)) acciones += '<button class="btn btn-ghost btn-xs pag-btn-reembolso" onclick="abrirReembolsoEst(' + p.id + ')">↩ Solicitar reembolso</button>';
     if (p.estado === 'pendiente' && p.enLinea) acciones += '<button class="btn btn-primary btn-xs" onclick="abrirPasarelaEst(pagoListaEst(' + p.id + '))">Pagar</button>';
     if (p.estado === 'pendiente' && !p.enLinea && !p.comprobanteUrl) acciones += '<button class="btn btn-primary btn-xs" onclick="abrirComprobanteEst(pagoListaEst(' + p.id + '))">Adjuntar comprobante</button>';
     if (p.estado === 'pendiente' && !p.enLinea && p.comprobanteUrl) acciones += '<span class="text-sm muted">Esperando confirmación</span>';

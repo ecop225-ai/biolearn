@@ -449,7 +449,7 @@ function renderSidebar() {
   html += '</div>';
   html += '<div class="sb-user"><div class="sb-avatar">' + esc(DOCENTE.nombre.split(' ').map(p=>p[0]).slice(0,2).join('')) + '</div>' +
     '<div class="sb-user-info"><div class="nombre">' + esc(DOCENTE.nombre) + '</div><div class="rol">Docente</div></div></div>' +
-    '<button class="sb-item" style="margin:0 12px 12px" onclick="confirmarCerrarSesion()">' + iconSvg('logout') + '<span class="sb-item-label">Cerrar sesión</span></button>';
+    '<button class="sb-item" style="margin:0 12px 12px;width:calc(100% - 24px)" onclick="confirmarCerrarSesion()">' + iconSvg('logout') + '<span class="sb-item-label">Cerrar sesión</span></button>';
   document.getElementById('sidebar').innerHTML = html;
 
   const badge = document.getElementById('notif-badge');

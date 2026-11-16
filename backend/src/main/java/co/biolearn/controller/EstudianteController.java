@@ -2,6 +2,7 @@ package co.biolearn.controller;
 
 import co.biolearn.dto.*;
 import co.biolearn.security.CustomUserDetails;
+import co.biolearn.service.AfiliacionEstudianteService;
 import co.biolearn.service.InscripcionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -26,11 +27,24 @@ import java.util.List;
 public class EstudianteController {
 
     private final InscripcionService servicio;
+    private final AfiliacionEstudianteService afiliacion;
 
     @GetMapping("/perfil")
     @Operation(summary = "Mis datos: institución, grado y área")
     public ResponseEntity<PerfilEstudianteResponse> perfil(@AuthenticationPrincipal CustomUserDetails u) {
         return ResponseEntity.ok(servicio.perfil(u.getUsuario()));
+    }
+
+    @PutMapping("/perfil/institucion")
+    @Operation(summary = "Unirme a mi colegio o cambiar de colegio con el código de afiliación del colegio (conserva cursos, pagos y certificados)")
+    public ResponseEntity<PerfilEstudianteResponse> unirse(@Valid @RequestBody UnirseInstitucionRequest request, @AuthenticationPrincipal CustomUserDetails u) {
+        return ResponseEntity.ok(afiliacion.unirse(request, u.getUsuario()));
+    }
+
+    @DeleteMapping("/perfil/institucion")
+    @Operation(summary = "Salir de mi colegio y quedar como estudiante independiente (conserva cursos, pagos y certificados)")
+    public ResponseEntity<PerfilEstudianteResponse> salir(@AuthenticationPrincipal CustomUserDetails u) {
+        return ResponseEntity.ok(afiliacion.salir(u.getUsuario()));
     }
 
     @GetMapping("/catalogo")

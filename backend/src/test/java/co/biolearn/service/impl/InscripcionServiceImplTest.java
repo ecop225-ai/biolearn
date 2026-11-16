@@ -77,7 +77,11 @@ class InscripcionServiceImplTest {
         when(inscripcionRepository.save(any(Inscripcion.class))).thenAnswer(i -> { Inscripcion x = i.getArgument(0); if (x.getId() == null) x.setId(100); return x; });
         when(progresoLeccionRepository.findByInscripcion_Id(anyInt())).thenAnswer(i -> new ArrayList<>(progresos));
         when(progresoLeccionRepository.save(any(ProgresoLeccion.class))).thenAnswer(i -> { ProgresoLeccion p = i.getArgument(0); progresos.removeIf(x -> x.getLeccion().getId().equals(p.getLeccion().getId())); progresos.add(p); return p; });
-        when(leccionRepository.findByCurso_IdOrderByOrdenAsc(anyInt())).thenReturn(List.of());
+        // por defecto cada curso tiene una lección activa (sin lecciones no se ofrece ni admite inscripciones)
+        when(leccionRepository.findByCurso_IdOrderByOrdenAsc(anyInt())).thenAnswer(a -> {
+            Integer idCurso = a.getArgument(0);
+            return List.of(Leccion.builder().id(900 + idCurso).nombre("Lección base").orden(1).estado("activa").build());
+        });
     }
 
     private Inscripcion inscripcion(Curso c, String estado) {
@@ -194,6 +198,37 @@ class InscripcionServiceImplTest {
             assertThat(r.get(1).isDeMiColegio()).isTrue();
             assertThat(r.get(0).isGratuito()).isTrue();
         }
+
+        @Test @DisplayName("Curso publicado sin lecciones activas: no sale en el catálogo, el detalle da 404 y la inscripción 409")
+        void sinLecciones() {
+            Curso vacio = curso(13, "activo", BigDecimal.ZERO);
+            when(leccionRepository.findByCurso_IdOrderByOrdenAsc(13)).thenReturn(List.of(
+                    Leccion.builder().id(5).nombre("Borrador").orden(1).estado("inactiva").build()));
+            when(cursoRepository.findAll()).thenReturn(List.of(gratis, vacio));
+            assertThat(servicio.catalogo(estU, null)).extracting(CursoEstudianteResponse::getId).containsExactly(10);
+            assertThatThrownBy(() -> servicio.detalle(13, estU)).isInstanceOf(RecursoNoEncontradoException.class);
+            assertThatThrownBy(() -> servicio.inscribirse(new InscripcionRequest(13, null), estU))
+                    .isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("todavía no tiene lecciones");
+        }
+
+        @Test @DisplayName("Curso solo para colegios: lo ven solo los estudiantes del colegio que lo contrató y se inscriben con el código")
+        void soloInstitucional() {
+            pago.setSoloInstitucional(true);
+            when(cursoRepository.findAll()).thenReturn(List.of(gratis, pago));
+            // otro estudiante (sin colegio): no lo ve ni puede abrir el detalle
+            assertThat(servicio.catalogo(otroU, null)).extracting(CursoEstudianteResponse::getId).containsExactly(10);
+            assertThatThrownBy(() -> servicio.detalle(11, otroU)).isInstanceOf(RecursoNoEncontradoException.class);
+            // estudiante del colegio que lo contrató: lo ve marcado y sin código no se inscribe
+            when(contratacionRepository.existsByCurso_IdAndInstitucion_Id(11, 4)).thenReturn(true);
+            List<CursoEstudianteResponse> r = servicio.catalogo(estU, null);
+            assertThat(r).extracting(CursoEstudianteResponse::getId).containsExactly(10, 11);
+            assertThat(r.get(1).isSoloInstitucional()).isTrue();
+            assertThatThrownBy(() -> servicio.inscribirse(new InscripcionRequest(11, null), estU))
+                    .isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("solo para colegios");
+            InstitucionCursoContratado ct = contratacion(pago, colegio, "ABCD2345");
+            servicio.inscribirse(new InscripcionRequest(11, "ABCD2345"), estU);
+            verify(inscripcionRepository).save(argThat(i -> i.getContratacion() == ct));
+        }
     }
 
     // ── retiro y gestión ──
@@ -218,6 +253,15 @@ class InscripcionServiceImplTest {
             inscripcion(pago, "pendiente_pago");
             when(pagoInscripcionRepository.existsByInscripcion_IdAndPago_EstadoIn(eq(100), anyCollection())).thenReturn(true);
             assertThatThrownBy(() -> servicio.retirarse(100, estU)).isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("pago en proceso");
+        }
+
+        @Test @DisplayName("Reembolsos: con una solicitud en trámite el curso queda en pausa (sin lecciones, sin retiro ni nueva inscripción)")
+        void enReembolso() {
+            inscripcion(pago, "en_reembolso");
+            assertThatThrownBy(() -> servicio.lecciones(11, estU)).isInstanceOf(SinPermisoException.class).hasMessageContaining("reembolso en trámite");
+            assertThatThrownBy(() -> servicio.retirarse(100, estU)).isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("reembolso en trámite");
+            assertThatThrownBy(() -> servicio.inscribirse(new InscripcionRequest(11, null), estU)).isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("reembolso en trámite");
+            assertThat(servicio.avance(Inscripcion.builder().id(100).curso(pago).estudiante(est).build())).isEqualByComparingTo("0");
         }
 
         @Test @DisplayName("Pagos: el pago aprobado activa la inscripción pendiente; otra no cambia")

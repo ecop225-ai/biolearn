@@ -121,6 +121,9 @@ class EstudianteSeleniumTest {
         inscribirseDesdeDetalle(curso);
         esperarMensaje("Inscripción exitosa");
         abrirCatalogo();
+        // el catálogo abre en «No inscritos»: el curso inscrito se ve en «Ya inscritos»
+        espera.until(d -> d.findElements(By.xpath("//*[@id='est-catalogo']//div[contains(@class,'est-curso-catalogo')][@data-nombre='" + curso + "']")).isEmpty());
+        clicSeguro(espera.until(ExpectedConditions.elementToBeClickable(By.id("est-ver-inscritos"))));
         WebElement boton = tarjetaCatalogo(curso).findElement(By.xpath(".//button[contains(.,'Inscrito')]"));
         assertThat(boton.isEnabled()).isFalse();
         capturar("CP-ES04_ya_inscrito");

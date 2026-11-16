@@ -73,6 +73,11 @@ public class Curso {
     @Builder.Default
     private BigDecimal precio = BigDecimal.ZERO;
 
+    /** Solo para colegios: no aparece en el catálogo abierto; se inscribe con el código del colegio (migración 009). */
+    @Column(name = "solo_institucional", nullable = false)
+    @Builder.Default
+    private Boolean soloInstitucional = false;
+
     /** TINYINT UNSIGNED NOT NULL DEFAULT 0 en la base: 0 significa "sin créditos definidos". */
     @Column(name = "creditos", nullable = false)
     @Builder.Default

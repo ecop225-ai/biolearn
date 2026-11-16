@@ -294,7 +294,7 @@ function renderSidebar() {
   NAV.forEach(item => { html += '<button class="sb-item' + (CURRENT===item.key?' activo':'') + '" onclick="goTo(\''+item.key+'\')">' + iconSvg(item.icon) + '<span class="sb-item-label">'+esc(item.label)+'</span></button>'; });
   html += '</div><div class="sb-user"><div class="sb-avatar">' + esc(ADMIN.nombre.split(' ').map(p=>p[0]).slice(0,2).join('')) + '</div>' +
     '<div class="sb-user-info"><div class="nombre">' + esc(ADMIN.nombre) + '</div><div class="rol">Administrador</div></div></div>' +
-    '<button class="sb-item" style="margin:0 12px 12px" onclick="confirmarCerrarSesion()">' + iconSvg('logout') + '<span class="sb-item-label">Cerrar sesión</span></button>';
+    '<button class="sb-item" style="margin:0 12px 12px;width:calc(100% - 24px)" onclick="confirmarCerrarSesion()">' + iconSvg('logout') + '<span class="sb-item-label">Cerrar sesión</span></button>';
   document.getElementById('sidebar').innerHTML = html;
   document.getElementById('sidebar').classList.toggle('collapsed', SIDEBAR_COLLAPSED);
   const badge = document.getElementById('notif-badge');
@@ -307,8 +307,7 @@ function irDesdeNotificacion(id, target) { marcarLeida(id); if (target) goTo(tar
 
 function renderTopbar() {
   const unread = DATA.notificaciones.filter(n=>!n.leido).length;
-  let html = '<div class="tb-left"><button class="tb-menu-btn" onclick="toggleSidebar()">☰</button>' +
-    '<div class="tb-search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input placeholder="Buscar..."></div></div>' +
+  let html = '<div class="tb-left"><button class="tb-menu-btn" onclick="toggleSidebar()">☰</button></div>' +
     '<div class="flex items-center gap-18">' +
     '<div class="tb-notif-wrap"><button class="tb-notif-btn" onclick="toggleNotif()">' + iconSvg('bell') + '<span class="tb-notif-badge" id="notif-badge" style="display:'+(unread>0?'flex':'none')+'">'+unread+'</span></button>' +
     '<div class="tb-notif-panel" id="notif-panel"><div class="tb-notif-header">Notificaciones</div>';

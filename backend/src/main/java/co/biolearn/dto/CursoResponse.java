@@ -23,6 +23,7 @@ public class CursoResponse {
     private String color;
     private String infoEstudiante;
     private BigDecimal precio;
+    private Boolean soloInstitucional;
     private Integer creditos;
     private Integer horasEstimadas;
     private String estado;

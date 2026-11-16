@@ -35,6 +35,7 @@ import java.util.List;
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
+    private final co.biolearn.service.AfiliacionEstudianteService afiliacionEstudianteService;
 
     @PostMapping
     @Operation(summary = "Crea la cuenta de un Docente, Contador o Supervisor; queda pendiente hasta que la persona invitada active su contraseña")
@@ -76,6 +77,14 @@ public class UsuarioController {
     public ResponseEntity<UsuarioAdminResponse> asignarInstitucion(@PathVariable Integer id,
                                                                    @Valid @RequestBody co.biolearn.dto.AsignarInstitucionRequest request) {
         return ResponseEntity.ok(usuarioService.asignarInstitucion(id, request));
+    }
+
+    @PutMapping("/{id}/institucion-estudiante")
+    @Operation(summary = "Asigna, cambia o quita (idInstitucion null) la institución de un estudiante; conserva sus cursos, pagos y certificados")
+    public ResponseEntity<co.biolearn.dto.PerfilEstudianteResponse> institucionEstudiante(@PathVariable Integer id,
+                                                                                       @RequestBody co.biolearn.dto.InstitucionEstudianteRequest request,
+                                                                                       @org.springframework.security.core.annotation.AuthenticationPrincipal co.biolearn.security.CustomUserDetails u) {
+        return ResponseEntity.ok(afiliacionEstudianteService.asignarPorAdministrador(id, request.getIdInstitucion(), u.getUsuario()));
     }
 
     @PatchMapping("/{id}/estado")

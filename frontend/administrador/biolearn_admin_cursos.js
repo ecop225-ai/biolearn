@@ -130,7 +130,7 @@ function pintarCursos() {
       '<td class="text-sm">' + (c.docenteTitular ? esc(c.docenteTitular) : '<span class="muted">Sin asignar</span>') + '</td>' +
       '<td class="text-sm">' + c.instituciones.length + '</td>' +
       '<td class="text-sm">' + (c.horarios.length ? c.horarios.length + (c.horarios.length === 1 ? ' sesión' : ' sesiones') + ' por semana' : '<span class="muted">Sin horario</span>') + '</td>' +
-      '<td class="text-sm">' + precioCOP(c.precio) + '</td>' +
+      '<td class="text-sm">' + precioCOP(c.precio) + (c.soloInstitucional ? '<div class="text-sm" style="color:var(--blue);font-weight:600" title="Solo para colegios">🏫 Solo colegios</div>' : '') + '</td>' +
       '<td>' + selector + '</td>' +
       '<td style="white-space:nowrap;text-align:right"><button class="btn btn-ghost btn-xs" onclick="verDetalleCurso(' + c.id + ')">👁 Ver</button> ' +
       (c.estado !== 'archivado' ? '<button class="btn btn-ghost btn-xs" onclick="abrirModalCurso(' + c.id + ')">✏️ Editar</button>' : '') + '</td></tr>';
@@ -199,6 +199,8 @@ function renderModalCurso() {
     '<div class="campo"><label for="cur-creditos">Créditos</label><input type="number" id="cur-creditos" min="1" max="100"></div></div>' +
     '<div class="grid-2"><div class="campo"><label for="cur-horas">Horas estimadas</label><input type="number" id="cur-horas" min="1" max="10000"></div>' +
     '<div class="campo"><label for="cur-portada">Imagen de portada (URL)</label><input type="url" id="cur-portada" maxlength="500" placeholder="https://..."></div></div>' +
+    '<label class="campo" style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="cur-solo-colegios" style="width:auto;margin-top:3px">' +
+    '<span><strong>Solo para colegios</strong><br><span class="hint" style="margin:0">No aparece en el catálogo abierto: lo ven los estudiantes de los colegios que lo contraten y se inscriben con el código del colegio.</span></span></label>' +
     '<div class="campo"><label for="cur-descripcion">Descripción</label><textarea id="cur-descripcion" rows="3" placeholder="Requerida para publicar"></textarea></div>' +
     '<div class="campo"><label for="cur-objetivos">Objetivos</label><textarea id="cur-objetivos" rows="2"></textarea></div>' +
     '</div><div class="modal-btns"><button class="btn btn-ghost" onclick="cerrarModal(\'modal-curso\')">Cancelar</button>' +
@@ -228,6 +230,7 @@ function abrirModalCurso(id) {
   document.getElementById('cur-portada').value = c && c.imagenPortada ? c.imagenPortada : '';
   document.getElementById('cur-descripcion').value = c && c.descripcion ? c.descripcion : '';
   document.getElementById('cur-objetivos').value = c && c.objetivos ? c.objetivos : '';
+  document.getElementById('cur-solo-colegios').checked = !!(c && c.soloInstitucional);
   abrirModal('modal-curso');
 }
 
@@ -238,7 +241,8 @@ async function guardarCurso() {
   const cuerpo = {
     nombre: val('cur-nombre'), idArea: num('cur-area'), idGrado: num('cur-grado'),
     precio: num('cur-precio'), creditos: num('cur-creditos'), horasEstimadas: num('cur-horas'),
-    imagenPortada: val('cur-portada'), descripcion: val('cur-descripcion'), objetivos: val('cur-objetivos')
+    imagenPortada: val('cur-portada'), descripcion: val('cur-descripcion'), objetivos: val('cur-objetivos'),
+    soloInstitucional: document.getElementById('cur-solo-colegios').checked
   };
   if (num('cur-docente') !== null) cuerpo.idDocenteTitular = num('cur-docente');
   if (!cuerpo.nombre || !cuerpo.idArea || !cuerpo.idGrado) { toast('Nombre, área y grado son obligatorios', true); return; }
@@ -295,7 +299,7 @@ function pintarDetalleCurso(c) {
       '<strong>Para publicarlo falta:</strong> ' + esc(c.pendientesParaPublicar.join('; ')) + '.</div>';
   }
   html += fila('Estado', pillEstadoCurso(c.estado)) + fila('Área · Grado', esc(c.area) + ' · ' + esc(c.grado)) +
-    fila('Docente titular', c.docenteTitular ? esc(c.docenteTitular) : 'Sin asignar') + fila('Precio', precioCOP(c.precio)) +
+    fila('Docente titular', c.docenteTitular ? esc(c.docenteTitular) : 'Sin asignar') + fila('Precio', precioCOP(c.precio) + (c.soloInstitucional ? ' · <span class="pill pill-azul">🏫 Solo para colegios</span>' : '')) +
     fila('Créditos · Horas', (c.creditos || '—') + ' · ' + (c.horasEstimadas || '—')) + fila('Creado por', esc(c.creadoPor) + ' · ' + esc(c.fechaCreacion || '')) +
     fila('Descripción', esc(c.descripcion || '—'));
 

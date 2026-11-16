@@ -17,6 +17,9 @@ let EST_INSCRIPCIONES = [];
 let EST_LECCIONES = [];
 let EST_LECCION = null;
 let EST_FILTRO = '';
+let EST_VER_CATALOGO = 'disponibles';   // disponibles (no inscritos) · inscritos · todos
+let EST_MIS_FILTRO = 'todos';           // filtro de «Mis cursos»
+let EST_MIS_BUSCAR = '';
 
 /* ---------------------------------------------------------------- sesión y comunicación */
 function authHeadersEst() {
@@ -47,9 +50,9 @@ async function pedirApiEst(metodo, ruta, cuerpo) {
 
 function urlEst(u) { return u && u.startsWith('/api/') ? API_BASE + u : u; }
 function precioEst(c) { return c.gratuito || !Number(c.precio) ? 'Gratuito' : '$' + Number(c.precio).toLocaleString('es-CO'); }
-const ESTADO_INSC_LABEL = { activa: 'Inscrito', completada: 'Completado', pendiente_pago: 'Pendiente de pago', retirada: 'Retirado', suspendida: 'Suspendida' };
+const ESTADO_INSC_LABEL = { activa: 'Inscrito', completada: 'Completado', pendiente_pago: 'Pendiente de pago', retirada: 'Retirado', suspendida: 'Suspendida', en_reembolso: 'Reembolso en trámite' };
 function pillInscripcion(e) {
-  const clase = { activa: 'pill-verde', completada: 'pill-azul', pendiente_pago: 'pill-ambar', retirada: 'pill-gris', suspendida: 'pill-clay' }[e] || 'pill-gris';
+  const clase = { activa: 'pill-verde', completada: 'pill-azul', pendiente_pago: 'pill-ambar', retirada: 'pill-gris', suspendida: 'pill-clay', en_reembolso: 'pill-ambar' }[e] || 'pill-gris';
   return '<span class="pill ' + clase + '">' + esc(ESTADO_INSC_LABEL[e] || e) + '</span>';
 }
 function portadaEst(c, alto) {
@@ -84,8 +87,10 @@ function renderCatalogo(cont) {
       '<div class="text-sm muted">Escríbelo para encontrar el curso que te asignaron.</div></div>' +
       '<input id="est-codigo" maxlength="8" placeholder="Ej: K7P2M9QX" style="width:170px;font-family:monospace;text-transform:uppercase">' +
       '<button class="btn btn-primary" id="est-btn-codigo" onclick="buscarCodigoEst()">Buscar</button></div>' +
-    '<div class="flex gap-10 mb-10"><input id="est-buscar" placeholder="Buscar por nombre, área o código..." style="width:320px" oninput="EST_FILTRO=this.value;pintarCatalogoEst()"></div>' +
-    '<div id="est-catalogo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px"><div class="empty-state">Cargando el catálogo...</div></div>';
+    '<div class="flex gap-10 mb-14 items-center" style="flex-wrap:wrap"><input id="est-buscar" placeholder="Buscar por nombre, área o código..." style="width:320px;max-width:100%" oninput="EST_FILTRO=this.value;pintarCatalogoEst()">' +
+    '<div id="est-ver-catalogo" class="flex gap-6" style="flex-wrap:wrap"></div></div>' +
+    '<div id="est-catalogo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px"><div class="empty-state">Cargando el catálogo...</div></div>' +
+    '<div id="est-carrito-flotante-wrap"></div>';
   document.getElementById('est-buscar').value = EST_FILTRO;
   pedirApiEst('GET', '/api/estudiante/catalogo').then(lista => { EST_CATALOGO = lista; pintarCatalogoEst(); })
     .catch(err => { document.getElementById('est-catalogo').innerHTML = '<div class="empty-state">' + esc(err.message) + '</div>'; });
@@ -93,20 +98,42 @@ function renderCatalogo(cont) {
 
 function normEst(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
 
+function inscritoEst(c) { return !!c.estadoInscripcion && c.estadoInscripcion !== 'retirada'; }
+
+/* Carrito a la mano: botón flotante abajo a la derecha mientras se recorre el catálogo o un detalle */
+function pintarCarritoFlotanteEst() {
+  const wrap = document.getElementById('est-carrito-flotante-wrap'); if (!wrap) return;
+  const n = DATA.carrito.length;
+  const btn = document.getElementById('est-btn-carrito');
+  if (btn) { btn.style.display = n ? '' : 'none'; btn.textContent = '🛒 Ver carrito (' + n + ')'; }
+  if (!n) { wrap.innerHTML = ''; return; }
+  const total = DATA.carrito.map(id => EST_CATALOGO.find(c => c.id === id)).filter(Boolean).reduce((s, c) => s + Number(c.precio || 0), 0);
+  wrap.innerHTML = '<button id="est-carrito-flotante" class="est-carrito-flotante" onclick="CHECKOUT_ABIERTO=true;CATALOGO_DETALLE=null;render();window.scrollTo(0,0)" title="Ir al carrito y pagar">' +
+    '<span style="font-size:18px">🛒</span><span><strong>' + n + ' curso' + (n === 1 ? '' : 's') + '</strong>' + (total ? ' · $' + total.toLocaleString('es-CO') : '') + '</span><span style="font-weight:800">Ir a pagar →</span></button>';
+}
+
 function pintarCatalogoEst() {
   const cont = document.getElementById('est-catalogo'); if (!cont) return;
-  const btn = document.getElementById('est-btn-carrito');
-  btn.style.display = DATA.carrito.length ? '' : 'none'; btn.textContent = '🛒 Ver carrito (' + DATA.carrito.length + ')';
+  pintarCarritoFlotanteEst();
+  const cuenta = { disponibles: EST_CATALOGO.filter(c => !inscritoEst(c)).length, inscritos: EST_CATALOGO.filter(inscritoEst).length, todos: EST_CATALOGO.length };
+  const chip = (v, t) => '<button class="est-chip' + (EST_VER_CATALOGO === v ? ' activo' : '') + '" id="est-ver-' + v + '" onclick="EST_VER_CATALOGO=\'' + v + '\';pintarCatalogoEst()">' + t + ' <span class="est-chip-n">' + cuenta[v] + '</span></button>';
+  document.getElementById('est-ver-catalogo').innerHTML = chip('disponibles', 'No inscritos') + chip('inscritos', 'Ya inscritos') + chip('todos', 'Todos');
   const q = normEst(EST_FILTRO.trim());
-  const lista = EST_CATALOGO.filter(c => !q || normEst([c.nombre, c.area, c.codigo].join(' ')).includes(q));
-  if (!lista.length) { cont.innerHTML = '<div class="empty-state">No hay cursos que coincidan.</div>'; return; }
+  const lista = EST_CATALOGO
+    .filter(c => EST_VER_CATALOGO === 'todos' || (EST_VER_CATALOGO === 'inscritos') === inscritoEst(c))
+    .filter(c => !q || normEst([c.nombre, c.area, c.codigo].join(' ')).includes(q));
+  if (!lista.length) {
+    cont.innerHTML = '<div class="empty-state">' + (q ? 'No hay cursos que coincidan.' : EST_VER_CATALOGO === 'disponibles' ? 'Ya estás inscrito en todos los cursos del catálogo.' : 'Todavía no te has inscrito en cursos del catálogo.') + '</div>';
+    return;
+  }
   cont.innerHTML = lista.map(c => {
-    const inscrito = !!c.estadoInscripcion && c.estadoInscripcion !== 'retirada';
+    const inscrito = inscritoEst(c);
     const enCarrito = DATA.carrito.includes(c.id);
     const accion = inscrito ? '<button class="btn btn-ghost" style="flex:1" disabled>' + esc(ESTADO_INSC_LABEL[c.estadoInscripcion]) + '</button>'
+      : c.soloInstitucional ? '<button class="btn btn-primary est-btn-con-codigo" style="flex:1" onclick="pedirCodigoEst()">🏫 Usar mi código</button>'
       : '<button class="btn ' + (enCarrito ? 'btn-ghost' : 'btn-primary') + '" style="flex:1" onclick="' + (enCarrito ? 'quitarDelCarrito' : 'agregarAlCarrito') + '(' + c.id + ')">' + (enCarrito ? '✓ En el carrito' : '+ Agregar') + '</button>';
     return '<div class="card est-curso-catalogo" data-nombre="' + esc(c.nombre) + '">' + portadaEst(c, 90) +
-      '<div class="flex justify-between items-start mb-8">' + (c.deMiColegio ? '<span class="pill pill-verde">🏫 Curso de tu colegio</span>' : '<span></span>') +
+      '<div class="flex justify-between items-start mb-8">' + (c.soloInstitucional ? '<span class="pill pill-azul">🏫 Con el código de tu colegio</span>' : c.deMiColegio ? '<span class="pill pill-verde">🏫 Curso de tu colegio</span>' : '<span></span>') +
       '<span style="font-size:19px;font-weight:800;color:var(--blue-deep)">' + precioEst(c) + '</span></div>' +
       '<h3 style="font-size:17px;margin:0 0 4px">' + esc(c.nombre) + '</h3>' +
       (c.codigo ? '<div class="text-sm mb-4" style="font-family:monospace;font-weight:700;color:var(--blue)">' + esc(c.codigo) + '</div>' : '') +
@@ -114,6 +141,13 @@ function pintarCatalogoEst() {
       '<div class="flex gap-14 text-sm muted mb-14"><span>📖 ' + c.totalLecciones + ' lecciones</span>' + (c.horasEstimadas ? '<span>⏱ ' + c.horasEstimadas + ' h</span>' : '') + '</div>' +
       '<div class="flex gap-8"><button class="btn btn-ghost" style="flex:1" onclick="verDetalleCatalogo(' + c.id + ')">Ver detalle</button>' + accion + '</div></div>';
   }).join('');
+}
+
+function pedirCodigoEst() {
+  const input = document.getElementById('est-codigo');
+  if (!input) { volverAlCatalogo(); setTimeout(pedirCodigoEst, 300); return; }
+  input.scrollIntoView({ behavior: 'smooth', block: 'center' }); input.focus();
+  toast('Este curso es solo para colegios: escribe el código de inscripción que te dio tu colegio');
 }
 
 function agregarAlCarrito(id) { if (!DATA.carrito.includes(id)) DATA.carrito.push(id); saveData(); toast('Curso agregado al carrito'); if (CATALOGO_DETALLE) render(); else pintarCatalogoEst(); }
@@ -157,13 +191,17 @@ function pintarDetalleEst(c) {
   if (inscrito) {
     html += '<div class="mb-8">' + pillInscripcion(c.estadoInscripcion) + '</div>' +
       (c.estadoInscripcion === 'activa' || c.estadoInscripcion === 'completada' ? '<button class="btn btn-primary w-full" style="justify-content:center" onclick="goTo(\'cursos\');abrirCurso(' + c.id + ')">Ir al curso</button>' : '');
+  } else if (c.soloInstitucional && !conCodigo) {
+    html += '<div class="card mb-8" id="est-solo-institucional" style="background:var(--blue-soft);box-shadow:none;padding:12px 14px">🏫 Este curso es solo para colegios. Inscríbete con el código de inscripción que te dio tu colegio.</div>' +
+      '<button class="btn btn-primary w-full" style="justify-content:center" onclick="pedirCodigoEst()">Escribir mi código</button>';
   } else {
     html += '<button class="btn btn-primary w-full" id="est-btn-inscribir" style="justify-content:center;margin-bottom:8px" onclick="inscribirseEst(' + c.id + ',' + (conCodigo ? '\'' + EST_CODIGO.codigo + '\'' : 'null') + ')">' + (c.gratuito ? 'Inscribirme gratis' : 'Inscribirme') + '</button>' +
       (conCodigo ? '' : '<button class="btn btn-ghost w-full" style="justify-content:center" onclick="' + (enCarrito ? 'quitarDelCarrito' : 'agregarAlCarrito') + '(' + c.id + ')">' + (enCarrito ? '✓ En el carrito' : '+ Agregar al carrito') + '</button>') +
       (!c.gratuito ? '<p class="text-sm muted" style="margin-top:10px">Tu cupo quedará reservado como «pendiente de pago»; podrás pagarlo cuando se habilite el pago en línea.</p>' : '');
   }
-  html += '</div></div></div>';
+  html += '</div></div></div><div id="est-carrito-flotante-wrap"></div>';
   document.getElementById('est-detalle').innerHTML = html;
+  pintarCarritoFlotanteEst();
 }
 
 async function inscribirseEst(idCurso, codigo) {
@@ -220,32 +258,65 @@ function renderCursos(cont) {
   if (LECCION_ACTIVA) { renderLeccionDetalle(cont); return; }
   if (CURSO_ACTIVO) { renderCursoDetalle(cont); return; }
   cont.innerHTML = '<div class="section-header"><div><h2>Mis cursos</h2><p class="subtitle">Cursos en los que estás inscrito</p></div></div>' +
+    '<div class="flex gap-10 mb-14 items-center" style="flex-wrap:wrap"><input id="est-mis-buscar" placeholder="Buscar en mis cursos por nombre o código..." style="width:320px;max-width:100%" oninput="EST_MIS_BUSCAR=this.value;pintarMisCursosEst()">' +
+    '<div id="est-mis-filtros" class="flex gap-6" style="flex-wrap:wrap"></div></div>' +
     '<div id="est-mis-cursos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px"><div class="empty-state">Cargando tus cursos...</div></div>';
-  pedirApiEst('GET', '/api/estudiante/inscripciones').then(lista => {
-    EST_INSCRIPCIONES = lista;
-    const visibles = lista.filter(i => i.estado !== 'retirada');
-    let html = visibles.map(i => {
-      const pct = Math.round(Number(i.porcentaje || 0));
-      const conAcceso = i.estado === 'activa' || i.estado === 'completada';
-      const color = i.estado === 'completada' ? 'var(--amber)' : pct > 0 ? 'var(--sage)' : 'var(--blue)';
-      const etapa = i.estado === 'completada' ? 'Completado' : i.estado === 'pendiente_pago' ? 'Pendiente de pago' : i.estado === 'suspendida' ? 'Suspendida' : pct > 0 ? 'En progreso' : 'Por comenzar';
-      return '<div class="card est-mi-curso" data-nombre="' + esc(i.curso) + '" ' + (conAcceso ? 'onclick="abrirCurso(' + i.idCurso + ')" style="cursor:pointer;' : 'style="opacity:.8;') + 'border-top:4px solid ' + color + '">' +
-        '<div class="flex justify-between items-start mb-14"><span style="font-size:30px">🧬</span>' + pillInscripcion(i.estado) + '</div>' +
-        '<div class="text-sm" style="font-weight:700;color:var(--ink-soft);text-transform:uppercase;margin-bottom:4px">' + etapa + '</div>' +
-        '<h3 style="font-size:17px;margin:0 0 4px">' + esc(i.curso) + '</h3>' +
-        (i.codigoCurso ? '<div class="text-sm mb-4" style="font-family:monospace;font-weight:700;color:' + color + '">' + esc(i.codigoCurso) + '</div>' : '') +
-        '<p class="text-sm muted mb-14">' + i.leccionesCompletadas + ' de ' + i.totalLecciones + ' lecciones' + (i.institucion ? ' · 🏫 ' + esc(i.institucion) : '') + '</p>' +
-        (conAcceso ? '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%;background:' + color + '"></div></div><p class="text-sm" style="color:' + color + ';font-weight:700;margin:6px 0 0">' + pct + '% completado</p>'
-          : (i.estado === 'pendiente_pago' ? '<p class="text-sm muted">Podrás ver las lecciones cuando se confirme el pago.</p><button class="btn btn-primary btn-xs est-btn-pagar" onclick="event.stopPropagation();goTo(\'pagos\')">💳 Pagar ahora</button>' : '<p class="text-sm muted">Comunícate con el administrador.</p>')) +
-        (i.estado === 'activa' || i.estado === 'pendiente_pago' ? '<button class="btn btn-ghost btn-xs" style="margin-top:10px" onclick="event.stopPropagation();retirarseEst(' + i.id + ',\'' + esc(i.curso).replace(/'/g, '') + '\')">Retirarme</button>' : '') +
-        '</div>';
-    }).join('');
+  document.getElementById('est-mis-buscar').value = EST_MIS_BUSCAR;
+  pedirApiEst('GET', '/api/estudiante/inscripciones').then(lista => { EST_INSCRIPCIONES = lista; pintarMisCursosEst(); })
+    .catch(err => { document.getElementById('est-mis-cursos').innerHTML = '<div class="empty-state">' + esc(err.message) + '</div>'; });
+}
+
+/* Filtros de «Mis cursos»: los retirados solo se ven en su propio filtro */
+const FILTROS_MIS_CURSOS = [
+  ['todos', 'Todos', i => i.estado !== 'retirada'],
+  ['progreso', 'En curso', i => i.estado === 'activa'],
+  ['pagar', 'Por pagar', i => i.estado === 'pendiente_pago'],
+  ['terminados', 'Terminados', i => i.estado === 'completada'],
+  ['colegio', 'De mi colegio', i => !!i.institucion && i.estado !== 'retirada'],
+  ['pausa', 'En pausa', i => i.estado === 'en_reembolso' || i.estado === 'suspendida'],
+  ['retirados', 'Retirados', i => i.estado === 'retirada'],
+];
+
+function pintarMisCursosEst() {
+  const cont = document.getElementById('est-mis-cursos'); if (!cont) return;
+  const lista = EST_INSCRIPCIONES;
+  if (!FILTROS_MIS_CURSOS.some(f => f[0] === EST_MIS_FILTRO)) EST_MIS_FILTRO = 'todos';
+  document.getElementById('est-mis-filtros').innerHTML = FILTROS_MIS_CURSOS.map(([v, t, f]) => {
+    const n = lista.filter(f).length;
+    if (!n && v !== 'todos' && v !== EST_MIS_FILTRO) return '';
+    return '<button class="est-chip' + (EST_MIS_FILTRO === v ? ' activo' : '') + '" id="est-mis-' + v + '" onclick="EST_MIS_FILTRO=\'' + v + '\';pintarMisCursosEst()">' + t + ' <span class="est-chip-n">' + n + '</span></button>';
+  }).join('');
+  const filtro = FILTROS_MIS_CURSOS.find(f => f[0] === EST_MIS_FILTRO)[2];
+  const q = normEst(EST_MIS_BUSCAR.trim());
+  const visibles = lista.filter(filtro).filter(i => !q || normEst([i.curso, i.codigoCurso, i.institucion].join(' ')).includes(q));
+  let html = visibles.map(i => {
+    const pct = Math.round(Number(i.porcentaje || 0));
+    const conAcceso = i.estado === 'activa' || i.estado === 'completada';
+    const color = i.estado === 'completada' ? 'var(--amber)' : pct > 0 ? 'var(--sage)' : 'var(--blue)';
+    const etapa = i.estado === 'completada' ? 'Completado' : i.estado === 'pendiente_pago' ? 'Pendiente de pago' : i.estado === 'suspendida' ? 'Suspendida' : i.estado === 'en_reembolso' ? 'En pausa' : i.estado === 'retirada' ? 'Retirado' : pct > 0 ? 'En progreso' : 'Por comenzar';
+    return '<div class="card est-mi-curso" data-nombre="' + esc(i.curso) + '" data-estado="' + i.estado + '" ' + (conAcceso ? 'onclick="abrirCurso(' + i.idCurso + ')" style="cursor:pointer;' : 'style="opacity:.8;') + 'border-top:4px solid ' + color + '">' +
+      '<div class="flex justify-between items-start mb-14"><span style="font-size:30px">🧬</span>' + pillInscripcion(i.estado) + '</div>' +
+      '<div class="text-sm" style="font-weight:700;color:var(--ink-soft);text-transform:uppercase;margin-bottom:4px">' + etapa + '</div>' +
+      '<h3 style="font-size:17px;margin:0 0 4px">' + esc(i.curso) + '</h3>' +
+      (i.codigoCurso ? '<div class="text-sm mb-4" style="font-family:monospace;font-weight:700;color:' + color + '">' + esc(i.codigoCurso) + '</div>' : '') +
+      '<p class="text-sm muted mb-14">' + i.leccionesCompletadas + ' de ' + i.totalLecciones + ' lecciones' + (i.institucion ? ' · 🏫 ' + esc(i.institucion) : '') + '</p>' +
+      (conAcceso ? '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%;background:' + color + '"></div></div><p class="text-sm" style="color:' + color + ';font-weight:700;margin:6px 0 0">' + pct + '% completado</p>'
+        : (i.estado === 'pendiente_pago' ? '<p class="text-sm muted">Podrás ver las lecciones cuando se confirme el pago.</p><button class="btn btn-primary btn-xs est-btn-pagar" onclick="event.stopPropagation();goTo(\'pagos\')">💳 Pagar ahora</button>'
+          : i.estado === 'en_reembolso' ? '<p class="text-sm muted est-en-reembolso">Tienes una solicitud de reembolso en trámite. Si se rechaza o la cancelas, el curso vuelve a estar disponible.</p><button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();goTo(\'pagos\')">Ver mi reembolso</button>'
+          : i.estado === 'retirada' ? '<p class="text-sm muted">Te retiraste de este curso. Si vuelves a inscribirte desde el catálogo, conservas tu progreso (' + pct + ' %).</p><button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();verDetalleDesdeMisCursosEst(' + i.idCurso + ')">Ver en el catálogo</button>'
+          : '<p class="text-sm muted">Comunícate con el administrador.</p>')) +
+      (i.estado === 'activa' || i.estado === 'pendiente_pago' ? '<button class="btn btn-ghost btn-xs" style="margin-top:10px" onclick="event.stopPropagation();retirarseEst(' + i.id + ',\'' + esc(i.curso).replace(/'/g, '') + '\')">Retirarme</button>' : '') +
+      '</div>';
+  }).join('');
+  if (!visibles.length) html = '<div class="empty-state" id="est-mis-vacio">' + (q ? 'Ninguno de tus cursos coincide con «' + esc(EST_MIS_BUSCAR.trim()) + '».' : EST_MIS_FILTRO === 'todos' ? 'Todavía no estás inscrito en ningún curso.' : 'No tienes cursos en este filtro.') + '</div>';
+  if (EST_MIS_FILTRO === 'todos' && !q)
     html += '<div onclick="goTo(\'catalogo\')" class="card" style="border:2px dashed var(--line);min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:10px">' +
       '<div style="width:44px;height:44px;border-radius:50%;background:var(--blue-soft);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--blue)">+</div>' +
       '<span style="font-weight:700;color:var(--blue)">Inscribirse a un curso</span></div>';
-    document.getElementById('est-mis-cursos').innerHTML = html;
-  }).catch(err => { document.getElementById('est-mis-cursos').innerHTML = '<div class="empty-state">' + esc(err.message) + '</div>'; });
+  cont.innerHTML = html;
 }
+
+function verDetalleDesdeMisCursosEst(idCurso) { goTo('catalogo'); verDetalleCatalogo(idCurso); }
 
 function retirarseEst(id, nombre) {
   confirmarAccion('¿Retirarte de <strong>' + esc(nombre) + '</strong>? Si vuelves a inscribirte, conservarás tu progreso.', async function () {

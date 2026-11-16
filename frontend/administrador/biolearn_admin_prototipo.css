@@ -24,9 +24,18 @@ body {
 }
 select { appearance:none; cursor:pointer; }
 ::selection { background:var(--blue-soft); }
-::-webkit-scrollbar { height:8px; width:8px; }
+/* Barras de desplazamiento más anchas y visibles (antes 8 px y del color de las líneas) */
+html { scrollbar-width:auto; scrollbar-color:#8C969E var(--bone-deep); }
+::-webkit-scrollbar { height:12px; width:12px; }
 ::-webkit-scrollbar-track { background:var(--bone-deep); }
-::-webkit-scrollbar-thumb { background:var(--line); border-radius:8px; }
+::-webkit-scrollbar-thumb { background:#9AA3AA; border-radius:8px; border:2px solid var(--bone-deep); }
+::-webkit-scrollbar-thumb:hover { background:#6F7A83; }
+/* Menú lateral: sin barra horizontal (dejaba una franja clara abajo) y con barra vertical oscura */
+#sidebar { overflow-x:hidden; scrollbar-color:rgba(255,255,255,.35) transparent; }
+#sidebar::-webkit-scrollbar { width:8px; }
+#sidebar::-webkit-scrollbar-track { background:transparent; }
+#sidebar::-webkit-scrollbar-thumb { background:rgba(255,255,255,.28); border:none; }
+#sidebar::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,.45); }
 h1,h2,h3 { font-family:'Fraunces',serif; margin:0; color:var(--ink); font-weight:600; }
 a { color:var(--blue); }
 button { font-family:inherit; }

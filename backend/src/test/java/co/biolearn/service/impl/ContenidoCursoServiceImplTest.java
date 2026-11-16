@@ -242,6 +242,19 @@ class ContenidoCursoServiceImplTest {
                     .isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("prerrequisito de una lección activa");
         }
 
+        @Test @DisplayName("Curso publicado: no se puede inactivar ni archivar su única lección activa (409); con otra activa, sí")
+        void unicaLeccionDeCursoPublicado() {
+            curso.setEstado("activo");
+            leccion(1, 1, "activa");
+            when(leccionRepository.countByCurso_IdAndEstado(10, "activa")).thenReturn(1L);
+            assertThatThrownBy(() -> servicio.cambiarEstadoLeccion(1, estado("inactiva"), titularU))
+                    .isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("única lección activa de un curso publicado");
+            assertThatThrownBy(() -> servicio.cambiarEstadoLeccion(1, estado("archivada"), titularU))
+                    .isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("única lección activa");
+            when(leccionRepository.countByCurso_IdAndEstado(10, "activa")).thenReturn(2L);
+            assertThat(servicio.cambiarEstadoLeccion(1, estado("inactiva"), titularU).getEstado()).isEqualTo("inactiva");
+        }
+
         @Test @DisplayName("Estado inexistente → 400")
         void estadoInvalido() {
             leccion(1, 1, "borrador");

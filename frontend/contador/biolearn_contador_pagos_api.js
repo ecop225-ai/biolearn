@@ -100,7 +100,7 @@ function renderPagos(cont) {
   let html = '<div class="section-header"><div><h2>Pagos</h2><p class="subtitle">Confirma las transferencias de los estudiantes; los pagos en línea los resuelve la pasarela</p></div></div>';
   html += '<div id="cp-resumen" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px"></div>';
   html += '<div class="flex gap-8 flex-wrap mb-14">';
-  [['', 'Todos'], ['pendiente', 'Pendientes'], ['aprobado', 'Aprobados'], ['rechazado', 'Rechazados'], ['cancelado', 'Cancelados']].forEach(([v, t]) => {
+  [['', 'Todos'], ['pendiente', 'Pendientes'], ['aprobado', 'Aprobados'], ['rechazado', 'Rechazados'], ['cancelado', 'Cancelados'], ['reembolsado', 'Reembolsados']].forEach(([v, t]) => {
     const a = CP_FILTRO.estado === v;
     html += '<button class="cp-chip" data-estado="' + v + '" onclick="CP_FILTRO.estado=\'' + v + '\';render()" style="padding:7px 14px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;border:1px solid ' + (a ? 'var(--blue)' : 'var(--line)') + ';background:' + (a ? 'var(--blue-soft)' : '#fff') + ';color:' + (a ? 'var(--blue-deep)' : 'var(--ink-soft)') + '">' + t + '</button>';
   });

@@ -25,9 +25,18 @@ body {
 }
 select { appearance:none; cursor:pointer; }
 ::selection { background:var(--blue-soft); }
-::-webkit-scrollbar { height:8px; width:8px; }
+/* Barras de desplazamiento más anchas y visibles (antes 8 px y del color de las líneas) */
+html { scrollbar-width:auto; scrollbar-color:#8C969E var(--bone-deep); }
+::-webkit-scrollbar { height:12px; width:12px; }
 ::-webkit-scrollbar-track { background:var(--bone-deep); }
-::-webkit-scrollbar-thumb { background:var(--line); border-radius:8px; }
+::-webkit-scrollbar-thumb { background:#9AA3AA; border-radius:8px; border:2px solid var(--bone-deep); }
+::-webkit-scrollbar-thumb:hover { background:#6F7A83; }
+/* Menú lateral: sin barra horizontal (dejaba una franja clara abajo) y con barra vertical oscura */
+#sidebar { overflow-x:hidden; scrollbar-color:rgba(255,255,255,.35) transparent; }
+#sidebar::-webkit-scrollbar { width:8px; }
+#sidebar::-webkit-scrollbar-track { background:transparent; }
+#sidebar::-webkit-scrollbar-thumb { background:rgba(255,255,255,.28); border:none; }
+#sidebar::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,.45); }
 h1,h2,h3 { font-family:'Fraunces',serif; margin:0; color:var(--ink); font-weight:600; }
 a { color:var(--blue); }
 button { font-family:inherit; }
@@ -248,3 +257,14 @@ textarea { resize:vertical; }
   .kpi-row { flex-direction:column; }
 }
 #toast-cnt-box { position:fixed; bottom:24px; right:24px; display:flex; flex-direction:column; gap:10px; z-index:200; }
+
+/* Filtros de «Mis cursos» y del catálogo */
+.est-chip { padding:7px 14px; border-radius:20px; font-size:13px; font-weight:700; cursor:pointer; border:1px solid var(--line); background:var(--panel); color:var(--ink-soft); font-family:inherit; }
+.est-chip:hover { border-color:var(--blue); }
+.est-chip.activo { border-color:var(--blue); background:var(--blue-soft); color:var(--blue-deep); }
+.est-chip-n { display:inline-block; min-width:20px; padding:0 6px; margin-left:4px; border-radius:10px; background:rgba(0,0,0,.06); font-size:12px; text-align:center; }
+/* Carrito a la mano: botón flotante en el catálogo */
+.est-carrito-flotante { position:fixed; left:calc(50% + var(--sidebar-w) / 2); transform:translateX(-50%); bottom:26px; z-index:150; display:flex; align-items:center; gap:12px; padding:13px 20px; border:none; border-radius:30px;
+  background:var(--blue-deep); color:#fff; font-family:inherit; font-size:14px; cursor:pointer; box-shadow:0 10px 28px rgba(20,40,34,.32); }
+.est-carrito-flotante:hover { background:var(--blue); box-shadow:0 14px 32px rgba(20,40,34,.38); }
+@media (max-width:900px) { .est-carrito-flotante { left:50%; bottom:16px; } }

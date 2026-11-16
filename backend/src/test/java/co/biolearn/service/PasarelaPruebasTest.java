@@ -43,4 +43,16 @@ class PasarelaPruebasTest {
         assertThatThrownBy(() -> pasarela.cobrar(pago("pse"), null)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("banco de prueba");
         assertThatThrownBy(() -> pasarela.cobrar(pago("transferencia"), new PagoPasarelaRequest())).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test @DisplayName("Reembolso (Fase 2): tarjeta y Nequi se devuelven al mismo medio; PSE, transferencia o un valor mayor al pago no")
+    void reembolsar() {
+        Pago tarjeta = pago("wompi_tarjeta"); tarjeta.setMonto(new java.math.BigDecimal("95000"));
+        assertThat(pasarela.reembolsar(tarjeta, new java.math.BigDecimal("50000"))).startsWith("PRUEBA-REV-");
+        Pago nequi = pago("wompi_nequi"); nequi.setMonto(new java.math.BigDecimal("95000"));
+        assertThat(pasarela.reembolsar(nequi, new java.math.BigDecimal("95000"))).startsWith("PRUEBA-REV-");
+        assertThatThrownBy(() -> pasarela.reembolsar(tarjeta, new java.math.BigDecimal("95001"))).isInstanceOf(IllegalArgumentException.class);
+        Pago pse = pago("pse"); pse.setMonto(new java.math.BigDecimal("95000"));
+        assertThatThrownBy(() -> pasarela.reembolsar(pse, new java.math.BigDecimal("1000"))).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("tarjeta o Nequi");
+    }
 }

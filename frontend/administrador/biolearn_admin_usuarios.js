@@ -138,6 +138,7 @@ function pintarTabla() {
       '<td><div class="flex gap-6" style="justify-content:flex-end">' +
       '<button class="btn btn-ghost btn-xs" onclick="verDetalleUsuario(' + u.id + ')">👁 Ver</button>' +
       (u.rol !== 'admin' && u.rol !== 'estudiante' ? '<button class="btn btn-ghost btn-xs" onclick="abrirModalEditarUsuario(' + u.id + ')">✏️ Editar</button>' : '') +
+      (u.rol === 'estudiante' ? '<button class="btn btn-ghost btn-xs usr-btn-inst-est" onclick="abrirInstitucionEstudiante(' + u.id + ')">🏫 Institución</button>' : '') +
       (u.estado === 'pendiente' && u.rol !== 'admin' && u.rol !== 'estudiante' ? '<button class="btn btn-ghost btn-xs" title="Genera un nuevo enlace de invitación (7 días)" onclick="reenviarInvitacion(' + u.id + ')">✉️ Reenviar invitación</button>' : '') +
       '</div></td></tr>';
   });
@@ -464,3 +465,64 @@ async function guardarUsuario() {
     btn.disabled = false; btn.textContent = original;
   }
 }
+
+/* ================================================================
+   Institución de un estudiante (casos especiales: perdió el código, error de vinculación).
+   PUT /api/usuarios/{id}/institucion-estudiante con idInstitucion o null (independiente).
+   El estudiante conserva sus cursos, su progreso, sus pagos y sus certificados.
+================================================================ */
+async function abrirInstitucionEstudiante(id) {
+  const headers = authHeaders();
+  if (!headers) return;
+  renderModalInstitucionEstudiante();
+  try {
+    const [r1, r2] = await Promise.all([fetch(API_BASE + '/api/usuarios/' + id, { headers }), fetch(API_BASE + '/api/instituciones?estado=activa', { headers })]);
+    if (manejarSesionExpirada(r1) || manejarSesionExpirada(r2)) return;
+    const u = await r1.json();
+    if (!r1.ok) throw new Error(u.mensaje || 'No se pudo cargar el estudiante.');
+    const lista = r2.ok ? await r2.json() : [];
+    document.getElementById('ie-id').value = id;
+    document.getElementById('ie-nombre').textContent = (u.nombre || '') + ' ' + (u.apellido || '') + ' · ' + (u.institucion ? 'actualmente en ' + u.institucion : 'actualmente independiente');
+    const sel = document.getElementById('ie-institucion');
+    sel.dataset.original = u.idInstitucion ? String(u.idInstitucion) : '';
+    let html = '<option value=""' + (u.idInstitucion ? '' : ' selected') + '>Independiente (sin institución)</option>';
+    if (u.idInstitucion && !lista.some(i => i.id === u.idInstitucion)) html += '<option value="' + u.idInstitucion + '" selected>' + esc(u.institucion) + ' (actual, no activa)</option>';
+    html += lista.map(i => '<option value="' + i.id + '"' + (i.id === u.idInstitucion ? ' selected' : '') + '>' + esc(i.nombre) + ' (#' + i.id + ')</option>').join('');
+    sel.innerHTML = html;
+    abrirModal('modal-inst-estudiante');
+  } catch (err) { toast(err.message, true); }
+}
+
+async function guardarInstitucionEstudiante() {
+  const headers = authHeaders();
+  if (!headers) return;
+  const id = document.getElementById('ie-id').value;
+  const sel = document.getElementById('ie-institucion');
+  if (sel.value === sel.dataset.original) { toast('No hay cambios', true); return; }
+  const btn = document.getElementById('ie-btn'); btn.disabled = true;
+  try {
+    const r = await fetch(API_BASE + '/api/usuarios/' + id + '/institucion-estudiante', { method: 'PUT', headers,
+      body: JSON.stringify({ idInstitucion: sel.value ? Number(sel.value) : null }) });
+    const d = await r.json();
+    if (manejarSesionExpirada(r)) return;
+    if (!r.ok) throw new Error(d.mensaje || 'No se pudo cambiar la institución.');
+    cerrarModal('modal-inst-estudiante');
+    toast(d.institucion ? 'El estudiante ahora pertenece a ' + d.institucion : 'El estudiante quedó como independiente');
+    cargarUsuarios();
+  } catch (err) { toast(err.message, true); }
+  btn.disabled = false;
+}
+
+function renderModalInstitucionEstudiante() {
+  if (document.getElementById('modal-inst-estudiante')) return;
+  const div = document.createElement('div');
+  div.innerHTML = '<div class="modal-overlay" id="modal-inst-estudiante"><div class="modal" style="max-width:480px">' +
+    '<div class="modal-header"><h3>Institución del estudiante</h3><button class="modal-close" onclick="cerrarModal(\'modal-inst-estudiante\')">✕</button></div>' +
+    '<div class="modal-body"><input type="hidden" id="ie-id"><p style="font-weight:700;margin:0 0 12px" id="ie-nombre"></p>' +
+    '<div class="campo"><label for="ie-institucion">Institución</label><select id="ie-institucion"></select>' +
+    '<p class="hint">Para casos especiales (perdió el código, error de vinculación). El estudiante también puede unirse, cambiar o salir desde su perfil con el código de afiliación. Conserva sus cursos, su progreso, sus pagos y sus certificados; la nueva institución debe tener cupos.</p></div></div>' +
+    '<div class="modal-btns"><button class="btn btn-ghost" onclick="cerrarModal(\'modal-inst-estudiante\')">Cancelar</button>' +
+    '<button class="btn btn-primary" id="ie-btn" onclick="guardarInstitucionEstudiante()">Guardar</button></div></div></div>';
+  document.body.appendChild(div.firstElementChild);
+}
+

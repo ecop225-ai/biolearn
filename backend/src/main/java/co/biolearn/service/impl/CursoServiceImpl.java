@@ -90,6 +90,7 @@ public class CursoServiceImpl implements CursoService {
                 .descripcion(texto(request.getDescripcion()))
                 .objetivos(texto(request.getObjetivos()))
                 .precio(request.getPrecio() != null ? request.getPrecio() : BigDecimal.ZERO)
+                .soloInstitucional(Boolean.TRUE.equals(request.getSoloInstitucional()))
                 .creditos(request.getCreditos() != null ? request.getCreditos() : 0)
                 .horasEstimadas(request.getHorasEstimadas())
                 .imagenPortada(limpiar(request.getImagenPortada()))
@@ -119,6 +120,7 @@ public class CursoServiceImpl implements CursoService {
         if (request.getDescripcion() != null) curso.setDescripcion(texto(request.getDescripcion()));
         if (request.getObjetivos() != null) curso.setObjetivos(texto(request.getObjetivos()));
         if (request.getPrecio() != null) curso.setPrecio(request.getPrecio());
+        if (request.getSoloInstitucional() != null) curso.setSoloInstitucional(request.getSoloInstitucional());
         if (request.getCreditos() != null) curso.setCreditos(request.getCreditos());
         if (request.getHorasEstimadas() != null) curso.setHorasEstimadas(request.getHorasEstimadas());
         if (request.getImagenPortada() != null) curso.setImagenPortada(limpiar(request.getImagenPortada()));
@@ -295,6 +297,7 @@ public class CursoServiceImpl implements CursoService {
     public List<CursoCatalogoResponse> catalogo(Integer idArea, Integer idGrado, String busqueda) {
         String q = busqueda != null ? normalizar(busqueda) : "";
         return cursoRepository.findByEstadoOrderByNombreAsc(ACTIVO).stream()
+                .filter(c -> !Boolean.TRUE.equals(c.getSoloInstitucional()))      // los cursos solo para colegios no se ofrecen al público
                 .filter(c -> idArea == null || c.getArea().getId().equals(idArea))
                 .filter(c -> idGrado == null || c.getGrado().getId().equals(idGrado))
                 .filter(c -> q.isEmpty() || normalizar(c.getNombre() + " " + Objects.toString(c.getDescripcion(), "")).contains(q))
@@ -306,7 +309,7 @@ public class CursoServiceImpl implements CursoService {
     @Transactional(readOnly = true)
     public CursoCatalogoResponse detalleCatalogo(Integer id) {
         Curso curso = cursoRepository.findById(id)
-                .filter(c -> ACTIVO.equals(c.getEstado()))
+                .filter(c -> ACTIVO.equals(c.getEstado()) && !Boolean.TRUE.equals(c.getSoloInstitucional()))
                 .orElseThrow(() -> new RecursoNoEncontradoException("El curso no existe o no está disponible"));
         return aCatalogo(curso);
     }
@@ -438,6 +441,7 @@ public class CursoServiceImpl implements CursoService {
         return CursoResponse.builder()
                 .id(c.getId()).nombre(c.getNombre()).descripcion(sinVacio(c.getDescripcion())).objetivos(sinVacio(c.getObjetivos()))
                 .imagenPortada(c.getImagenPortada()).precio(c.getPrecio()).creditos(sinCero(c.getCreditos()))
+                .soloInstitucional(Boolean.TRUE.equals(c.getSoloInstitucional()))
                 .codigo(c.getCodigo()).color(c.getColor()).infoEstudiante(c.getInfoEstudiante())
                 .horasEstimadas(c.getHorasEstimadas()).estado(c.getEstado())
                 .idArea(c.getArea().getId()).area(c.getArea().getNombre())

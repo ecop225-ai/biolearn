@@ -26,9 +26,9 @@ public class ArchivoController {
     private final co.biolearn.service.ArchivoFirma archivoFirma;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','ESTUDIANTE')")
+    @PreAuthorize("hasAnyRole('DOCENTE','ADMIN','ESTUDIANTE','CONTADOR')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Sube un PDF, PNG o JPG de máximo 10 MB (docentes y Administrador para los cursos; estudiantes para el comprobante de pago); el tipo se valida por el contenido real del archivo")
+    @Operation(summary = "Sube un PDF, PNG o JPG de máximo 10 MB (docentes y Administrador para los cursos; estudiantes para el comprobante de pago; contadores para el comprobante de la devolución de un reembolso); el tipo se valida por el contenido real del archivo")
     public ResponseEntity<ArchivoResponse> subir(@RequestPart("archivo") MultipartFile archivo) {
         return ResponseEntity.status(HttpStatus.CREATED).body(archivoService.guardar(archivo));
     }

@@ -20,6 +20,7 @@ import java.util.*;
 
 /**
  * Inscripciones y aprendizaje del estudiante (Fase 3).
+ * - Una inscripción en_reembolso (Pagos, Fase 2) queda en pausa: sin acceso hasta que se resuelva la solicitud.
  * - Solo cursos activos. Gratuito → inscripción activa; con precio → pendiente_pago (la activa el pago aprobado, activarPorPago).
  * - El código de inscripción de una contratación solo lo usan estudiantes de esa institución y vincula la inscripción.
  * - Retirarse y volver a inscribirse reactiva la misma inscripción (se conserva el progreso).
@@ -69,6 +70,8 @@ public class InscripcionServiceImpl implements InscripcionService {
         String q = normalizar(busqueda);
         return cursoRepository.findAll().stream()
                 .filter(c -> "activo".equals(c.getEstado()))
+                .filter(c -> !leccionesActivas(c.getId()).isEmpty())                 // sin lecciones no se ofrece
+                .filter(c -> !soloInstitucional(c) || deMiColegio(c, est))          // solo para colegios: lo ven sus estudiantes
                 .filter(c -> q.isEmpty() || normalizar(c.getNombre() + " " + c.getArea().getNombre() + " " + (c.getCodigo() == null ? "" : c.getCodigo())).contains(q))
                 .sorted(Comparator.comparing(Curso::getNombre))
                 .map(c -> aCurso(c, est, false))
@@ -81,7 +84,8 @@ public class InscripcionServiceImpl implements InscripcionService {
         PerfilEstudiante est = perfilDe(usuario);
         Curso c = buscarCurso(idCurso);
         boolean inscrito = inscripcionRepository.findByCurso_IdAndEstudiante_Id(idCurso, est.getId()).isPresent();
-        if (!"activo".equals(c.getEstado()) && !inscrito) throw new RecursoNoEncontradoException("El curso no existe o no está disponible");
+        boolean ofrecido = "activo".equals(c.getEstado()) && !leccionesActivas(c.getId()).isEmpty() && (!soloInstitucional(c) || deMiColegio(c, est));
+        if (!ofrecido && !inscrito) throw new RecursoNoEncontradoException("El curso no existe o no está disponible");
         return aCurso(c, est, true);
     }
 
@@ -106,14 +110,19 @@ public class InscripcionServiceImpl implements InscripcionService {
             ct = contratacionValida(req.getCodigo(), est);
             if (!ct.getCurso().getId().equals(curso.getId())) throw new IllegalArgumentException("El código de inscripción no corresponde a este curso");
         }
+        if (leccionesActivas(curso.getId()).isEmpty())
+            throw new SolicitudInvalidaException("El curso todavía no tiene lecciones disponibles; podrás inscribirte cuando se publiquen");
         String estadoInicial = gratuito(curso) ? "activa" : "pendiente_pago";
         Optional<Inscripcion> previa = inscripcionRepository.findByCurso_IdAndEstudiante_Id(curso.getId(), est.getId());
+        if (soloInstitucional(curso) && ct == null && previa.map(Inscripcion::getContratacion).isEmpty())
+            throw new SolicitudInvalidaException("Este curso es solo para colegios: inscríbete con el código de inscripción que te dio tu colegio");
         Inscripcion insc;
         if (previa.isPresent()) {
             insc = previa.get();
             switch (insc.getEstado()) {
                 case "retirada" -> insc.setEstado(estadoInicial);            // se reactiva y conserva el progreso
                 case "suspendida" -> throw new SolicitudInvalidaException("Tu inscripción en este curso está suspendida; comunícate con el administrador");
+                case "en_reembolso" -> throw new SolicitudInvalidaException("Tienes una solicitud de reembolso en trámite para este curso");
                 default -> throw new SolicitudInvalidaException("Ya estás inscrito en este curso");
             }
             if (ct != null) insc.setContratacion(ct);
@@ -145,6 +154,7 @@ public class InscripcionServiceImpl implements InscripcionService {
             case "activa", "pendiente_pago" -> insc.setEstado("retirada");
             case "completada" -> throw new SolicitudInvalidaException("Ya completaste este curso; no puedes retirarte");
             case "retirada" -> throw new SolicitudInvalidaException("Ya te retiraste de este curso");
+            case "en_reembolso" -> throw new SolicitudInvalidaException("Tienes una solicitud de reembolso en trámite para este curso; cancélala o espera su resultado");
             default -> throw new SolicitudInvalidaException("Tu inscripción está suspendida; comunícate con el administrador");
         }
         return aInscripcion(inscripcionRepository.save(insc), false);
@@ -280,6 +290,12 @@ public class InscripcionServiceImpl implements InscripcionService {
         actualizarCompletacion(insc);
     }
 
+    /** Pagos, Fase 2: avance del curso (0 a 100) para la regla de reembolso (menos del 20 %). */
+    @Transactional(readOnly = true)
+    public BigDecimal avance(Inscripcion insc) {
+        return porcentajeCurso(insc, progresoPorLeccion(insc));
+    }
+
     void actualizarCompletacion(Inscripcion insc) {
         if (!CON_ACCESO.contains(insc.getEstado())) return;
         List<Leccion> activas = leccionesActivas(insc.getCurso().getId());
@@ -324,6 +340,13 @@ public class InscripcionServiceImpl implements InscripcionService {
 
     // ── reglas auxiliares ───────────────────────────────────────────────────
 
+    private static boolean soloInstitucional(Curso c) { return Boolean.TRUE.equals(c.getSoloInstitucional()); }
+
+    /** El colegio del estudiante contrató el curso. */
+    private boolean deMiColegio(Curso c, PerfilEstudiante est) {
+        return est.getInstitucion() != null && contratacionRepository.existsByCurso_IdAndInstitucion_Id(c.getId(), est.getInstitucion().getId());
+    }
+
     private InstitucionCursoContratado contratacionValida(String codigo, PerfilEstudiante est) {
         String c = codigo == null ? "" : codigo.trim().toUpperCase();
         InstitucionCursoContratado ct = contratacionRepository.findByCodigoInscripcion(c)
@@ -341,6 +364,7 @@ public class InscripcionServiceImpl implements InscripcionService {
         throw new SinPermisoException(switch (insc.getEstado()) {
             case "pendiente_pago" -> "Tu inscripción está pendiente de pago; podrás ver las lecciones cuando se confirme";
             case "suspendida" -> "Tu inscripción está suspendida; comunícate con el administrador";
+            case "en_reembolso" -> "Tienes una solicitud de reembolso en trámite para este curso; el acceso vuelve si se rechaza o la cancelas";
             default -> "Te retiraste de este curso; vuelve a inscribirte para ver las lecciones";
         });
     }
@@ -401,7 +425,7 @@ public class InscripcionServiceImpl implements InscripcionService {
 
     private CursoEstudianteResponse aCurso(Curso c, PerfilEstudiante est, boolean conLecciones) {
         Optional<Inscripcion> insc = inscripcionRepository.findByCurso_IdAndEstudiante_Id(c.getId(), est.getId());
-        boolean deMiColegio = est.getInstitucion() != null && contratacionRepository.existsByCurso_IdAndInstitucion_Id(c.getId(), est.getInstitucion().getId());
+        boolean deMiColegio = deMiColegio(c, est);
         List<Leccion> activas = leccionesActivas(c.getId());
         PerfilDocente t = c.getDocenteTitular();
         return CursoEstudianteResponse.builder()
@@ -411,7 +435,7 @@ public class InscripcionServiceImpl implements InscripcionService {
                 .precio(c.getPrecio()).gratuito(gratuito(c))
                 .creditos(c.getCreditos() == null || c.getCreditos() == 0 ? null : c.getCreditos()).horasEstimadas(c.getHorasEstimadas())
                 .docenteTitular(t != null ? t.getUsuario().getNombre() + " " + t.getUsuario().getApellido() : null)
-                .totalLecciones(activas.size()).deMiColegio(deMiColegio)
+                .totalLecciones(activas.size()).deMiColegio(deMiColegio).soloInstitucional(soloInstitucional(c))
                 .idInscripcion(insc.map(Inscripcion::getId).orElse(null))
                 .estadoInscripcion(insc.map(Inscripcion::getEstado).orElse(null))
                 .porcentaje(insc.filter(i -> CON_ACCESO.contains(i.getEstado())).map(i -> porcentajeCurso(i, progresoPorLeccion(i))).orElse(null))

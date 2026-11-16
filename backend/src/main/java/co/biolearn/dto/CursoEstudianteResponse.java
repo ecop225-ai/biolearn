@@ -27,6 +27,8 @@ public class CursoEstudianteResponse {
     private long totalLecciones;
     /** true si la institución del estudiante contrató el curso. */
     private boolean deMiColegio;
+    /** Solo para colegios: el estudiante se inscribe con el código que le dio su colegio. */
+    private boolean soloInstitucional;
     private Integer idInscripcion;
     private String estadoInscripcion;
     private BigDecimal porcentaje;

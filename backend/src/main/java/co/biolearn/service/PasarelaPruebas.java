@@ -4,6 +4,7 @@ import co.biolearn.dto.PagoPasarelaRequest;
 import co.biolearn.model.Pago;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
@@ -12,6 +13,7 @@ import java.util.UUID;
  * - Nequi: 3991111111 aprueba; 3992222222 rechaza.
  * - PSE: banco "1" aprueba; banco "2" rechaza.
  * Cualquier otro dato es inválido (400), para que la prueba sea explícita.
+ * Reembolso (Fase 2): la devolución al mismo medio (tarjeta o Nequi) siempre se aprueba, con referencia PRUEBA-REV-….
  */
 @Component
 public class PasarelaPruebas implements PasarelaPago {
@@ -46,6 +48,15 @@ public class PasarelaPruebas implements PasarelaPago {
             }
             default -> throw new IllegalArgumentException("Este medio de pago no se procesa en la pasarela");
         };
+    }
+
+    @Override
+    public String reembolsar(Pago pago, BigDecimal monto) {
+        if (!"wompi_tarjeta".equals(pago.getMedioPago()) && !"wompi_nequi".equals(pago.getMedioPago()))
+            throw new IllegalArgumentException("Solo los pagos con tarjeta o Nequi se devuelven por la pasarela");
+        if (monto == null || monto.signum() <= 0 || monto.compareTo(pago.getMonto()) > 0)
+            throw new IllegalArgumentException("El valor a devolver no es válido");
+        return "PRUEBA-REV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     private static String soloDigitos(String s) { return s == null ? "" : s.replaceAll("\\D", ""); }

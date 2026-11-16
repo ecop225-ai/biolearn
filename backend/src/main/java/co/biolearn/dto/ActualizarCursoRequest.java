@@ -39,6 +39,9 @@ public class ActualizarCursoRequest {
     @Pattern(regexp = "^$|^https?://\\S+$", message = "La portada debe ser una URL que empiece por http:// o https://")
     private String imagenPortada;
 
+    /** Solo para colegios: fuera del catálogo abierto; se inscribe con el código del colegio. */
+    private Boolean soloInstitucional;
+
     /** Id de USUARIO del nuevo docente titular. */
     private Integer idDocenteTitular;
 }

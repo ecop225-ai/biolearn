@@ -92,6 +92,27 @@ public class CorreoService {
                         "También puedes consultarla en «Mis pagos». Proyecto académico sin validez fiscal."));
     }
 
+    /** Nota crédito de un reembolso aprobado (Pagos, Fase 2); el detalle llega como filas HTML. */
+    public void notaCredito(String correo, String nombre, String numero, String numeroFactura, String filasHtml, String total, String pie) {
+        String cuerpo = "<p>Tu solicitud de reembolso fue aprobada. Emitimos la nota crédito <strong>" + esc(numero)
+                + "</strong> sobre tu factura <strong>" + esc(numeroFactura) + "</strong>:</p>"
+                + "<table style=\"width:100%;border-collapse:collapse;font-size:14px;margin:10px 0\">"
+                + "<tr style=\"background:#E4EEE9\"><th style=\"text-align:left;padding:8px\">Curso reembolsado</th><th style=\"text-align:right;padding:8px\">Valor</th></tr>"
+                + filasHtml
+                + "<tr><td style=\"padding:8px;font-weight:800\">Total a devolver</td><td style=\"padding:8px;text-align:right;font-weight:800\">" + esc(total) + "</td></tr></table>"
+                + "<p style=\"font-size:13px;color:#555\">" + pie + "</p>";
+        enviar(correo, "Nota crédito " + numero + " · BioLearn",
+                plantilla("¡Hola, " + nombre + "!", cuerpo, null, null,
+                        "Consulta el estado de tu reembolso en «Mis pagos». Proyecto académico sin validez fiscal."));
+    }
+
+    /** Aviso del reembolso: rechazado o dinero devuelto. El mensaje llega ya escapado desde el servicio. */
+    public void avisoReembolso(String correo, String nombre, String asunto, String mensajeHtml) {
+        enviar(correo, asunto + " · BioLearn",
+                plantilla("¡Hola, " + nombre + "!", "<p>" + mensajeHtml + "</p>", null, null,
+                        "Consulta el detalle en «Mis pagos» de BioLearn."));
+    }
+
     // ── envío ───────────────────────────────────────────────────────────────
 
     /** Envía en segundo plano; sin configuración, solo deja el aviso en la consola. */
