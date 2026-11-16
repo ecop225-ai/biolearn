@@ -267,11 +267,13 @@ const NAV = [
   { key:'catalogos', label:'Catálogos', icon:'library' },
   { key:'cursos', label:'Cursos', icon:'grad' },
   { key:'reportes', label:'Reportes', icon:'chart' },
+  { key:'finanzas', label:'Finanzas', icon:'wallet' },
   { key:'mensajeria', label:'Mensajería', icon:'send' },
   { key:'perfil', label:'Mi perfil', icon:'user' },
 ];
 const ICONS = {
   grid:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+  wallet:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>',
   users:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   building:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 22V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v18Z"/><path d="M2 22h20"/><path d="M9 8h1M14 8h1M9 12h1M14 12h1M9 16h1M14 16h1"/></svg>',
   library:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22V6a2 2 0 0 1 2-2h4v18"/><path d="M14 22V4h4a2 2 0 0 1 2 2v16"/><line x1="2" y1="22" x2="22" y2="22"/></svg>',
@@ -339,6 +341,7 @@ function render() {
   const renderers = {
     inicio: renderInicio, usuarios: renderUsuarios, instituciones: renderInstituciones,
     catalogos: renderCatalogos, cursos: renderCursos, reportes: renderReportes,
+    finanzas: typeof renderFinanzasAdmin === 'function' ? renderFinanzasAdmin : renderInicio,
     mensajeria: renderMensajeria, perfil: renderPerfil,
   };
   (renderers[CURRENT] || renderInicio)(cont);

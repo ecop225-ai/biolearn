@@ -110,6 +110,10 @@ WHERE nombre LIKE 'Área Selenium %'
   AND NOT EXISTS (SELECT 1 FROM curso c WHERE c.id_area = area_academica.id_area)
   AND NOT EXISTS (SELECT 1 FROM perfil_estudiante pe WHERE pe.id_area = area_academica.id_area);
 
+-- 5. Pagos, Fase 3: registros de los reportes generados por FinanzasSeleniumTest (las versiones de
+--    datos_facturacion que crea CP-FI05 se conservan: la última deja los datos como estaban)
+DELETE FROM reporte_financiero WHERE motivo LIKE '%Selenium%';
+
 COMMIT;
 
 DROP TEMPORARY TABLE tmp_usuarios_prueba;

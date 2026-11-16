@@ -403,7 +403,7 @@ public class PagoServiceImpl implements PagoService {
         Usuario u = f.getEstudiante().getUsuario();
         return FacturaResponse.builder()
                 .id(f.getId()).numero(f.getNumero()).fechaEmision(f.getFechaEmision()).estado(f.getEstado())
-                .razonSocial(d != null ? d.getRazonSocial() : null).nit(d != null ? d.getNit() : null).direccionEmisor(d != null ? d.getDireccion() : null)
+                .razonSocial(d != null ? d.getRazonSocial() : null).nit(d != null ? d.getNit() : null).direccionEmisor(FinanzasServiceImpl.direccionCompleta(d))
                 .idEstudiante(f.getEstudiante().getId()).estudiante(nombre(u)).correo(u.getCorreo()).documento(u.getDocIdentidad())
                 .descripcion(f.getDescripcion())
                 .items(p.getItems().stream().map(x -> item(x.getInscripcion(), x.getMontoAsignado())).toList())

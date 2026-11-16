@@ -3,7 +3,6 @@
 ================================================================ */
 const REPORT_TYPES = [
   { value:'usuarios', label:'Usuarios registrados por período', icon:'👥' },
-  { value:'ingresos', label:'Ingresos y pagos del sistema', icon:'💰' },
   { value:'actividad', label:'Actividad por curso e institución', icon:'📊' },
   { value:'docentes', label:'Rendimiento de docentes', icon:'🎓' },
   { value:'institucion', label:'Reporte por institución', icon:'🏫' },
@@ -61,25 +60,11 @@ function renderReportes(cont) {
     });
     html += '</div>';
   } else {
-    html += '<div class="kpi-row">' +
-      '<div class="kpi-card" style="border-left-color:var(--amber)"><div class="text-sm muted">Ingresos septiembre</div><div class="kpi-value">$14.8M</div><div class="text-sm" style="color:var(--blue);font-weight:700">↑ 9.6%</div></div>' +
-      '<div class="kpi-card" style="border-left-color:var(--clay)"><div class="text-sm muted">Egresos septiembre</div><div class="kpi-value">$4.9M</div></div>' +
-      '<div class="kpi-card" style="border-left-color:var(--sage)"><div class="text-sm muted">Reembolsos procesados</div><div class="kpi-value">6</div></div></div>';
-    html += '<div class="card mb-18">';
-    const maxMonto = Math.max(...DATA.ingresosMensuales.map(m=>m.ingresos),1);
-    html += '<div class="flex items-end gap-14" style="height:180px">';
-    DATA.ingresosMensuales.forEach(m => {
-      html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%"><div class="flex items-end gap-4" style="height:100%;width:100%;justify-content:center">' +
-        '<div style="width:38%;border-radius:5px 5px 0 0;background:var(--amber);height:'+((m.ingresos/maxMonto)*100)+'%"></div>' +
-        '<div style="width:38%;border-radius:5px 5px 0 0;background:var(--clay);height:'+((m.egresos/maxMonto)*100)+'%"></div></div>' +
-        '<span class="text-sm muted" style="margin-top:6px">' + m.mes + '</span></div>';
-    });
-    html += '</div></div>';
-    html += '<div class="card"><h3 style="font-family:\'Fraunces\',serif;font-size:17px;margin:0 0 14px">Documentos disponibles</h3>';
-    ['Estado de cuenta general — septiembre','Facturación por institución','Reembolsos aprobados y pendientes'].forEach((r,i) => {
-      html += '<div class="flex justify-between items-center" style="padding:12px 0;'+(i>0?'border-top:1px solid var(--line)':'')+'"><span style="font-size:14px">' + r + '</span><button class="btn btn-ghost btn-sm" onclick="descargarDocReporte(\''+r.replace(/'/g,"\\'")+'\')">⬇ Descargar</button></div>';
-    });
-    html += '</div>';
+    // Pagos, Fase 3: los reportes financieros reales están en la sección Finanzas
+    html += '<div class="card" id="rep-ir-finanzas" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">' +
+      '<div><h3 style="font-family:\'Fraunces\',serif;font-size:17px;margin:0 0 4px">Reportes financieros</h3>' +
+      '<p class="text-sm muted" style="margin:0">Ingresos, facturas, reembolsos y el reporte general, en PDF y Excel, con datos reales.</p></div>' +
+      '<button class="btn btn-primary" onclick="goTo(\'finanzas\')">Ir a Finanzas →</button></div>';
   }
   cont.innerHTML = html;
 }

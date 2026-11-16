@@ -149,12 +149,25 @@ async function pagarPasarelaEst() {
 }
 
 /* ================================================================ TRANSFERENCIA: COMPROBANTE */
-function abrirComprobanteEst(pago) {
+async function abrirComprobanteEst(pago) {
   PAG_ACTUAL = pago;
-  document.getElementById('comp-resumen').innerHTML = 'Transfiere <strong>' + pesosEst(pago.monto) + '</strong> a la cuenta de ahorros <strong>BioLearn S.A.S. · 000-123456-78</strong> y adjunta el comprobante.<br>' +
-    '<span class="text-sm muted">' + pago.items.map(i => esc(i.curso)).join(' · ') + '</span>';
+  const cursos = '<span class="text-sm muted">' + pago.items.map(i => esc(i.curso)).join(' · ') + '</span>';
+  document.getElementById('comp-resumen').innerHTML = 'Cargando los datos de la cuenta…';
   document.getElementById('comp-archivo').value = '';
   abrirModal('modal-comprobante');
+  // Pagos, Fase 3: la cuenta y el Nequi vigentes los define BioLearn (antes estaban escritos aquí)
+  try {
+    const c = await pedirApiEst('GET', '/api/estudiante/datos-recaudo');
+    document.getElementById('comp-resumen').innerHTML = 'Transfiere <strong>' + pesosEst(pago.monto) + '</strong> a:' +
+      '<div id="comp-cuenta" style="background:var(--bone);border-radius:10px;padding:10px 14px;margin:8px 0;line-height:1.7">' +
+      '🏦 <strong>' + esc(c.banco) + '</strong> · cuenta de ' + esc(c.tipoCuenta) + ' <strong style="font-family:monospace">' + esc(c.numeroCuenta) + '</strong><br>' +
+      'Titular: ' + esc(c.titular) + ' · NIT/CC ' + esc(c.documentoTitular) +
+      (c.telefonoNequi ? '<br>📱 También por Nequi: <strong style="font-family:monospace">' + esc(c.telefonoNequi) + '</strong>' : '') + '</div>' +
+      (c.instrucciones ? '<div class="text-sm" style="margin-bottom:6px">' + esc(c.instrucciones) + ' (pago #' + pago.id + ')</div>' : '') +
+      'Luego adjunta el comprobante.<br>' + cursos;
+  } catch (err) {
+    document.getElementById('comp-resumen').innerHTML = esc(err.message) + '<br>' + cursos;
+  }
 }
 
 async function subirComprobanteEst() {

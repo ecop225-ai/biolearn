@@ -2,6 +2,7 @@ package co.biolearn.controller;
 
 import co.biolearn.dto.*;
 import co.biolearn.security.CustomUserDetails;
+import co.biolearn.service.FinanzasService;
 import co.biolearn.service.PagoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -26,6 +27,7 @@ import java.util.List;
 public class EstudiantePagoController {
 
     private final PagoService servicio;
+    private final FinanzasService finanzas;
 
     @GetMapping("/carrito")
     @Operation(summary = "Cursos pendientes de pago listos para pagar, con el total, y los que ya tienen un pago en proceso")
@@ -76,5 +78,11 @@ public class EstudiantePagoController {
     @Operation(summary = "Una de mis facturas")
     public ResponseEntity<FacturaResponse> factura(@PathVariable Integer id, @AuthenticationPrincipal CustomUserDetails u) {
         return ResponseEntity.ok(servicio.miFactura(id, u.getUsuario()));
+    }
+
+    @GetMapping("/datos-recaudo")
+    @Operation(summary = "Cuenta bancaria y Nequi vigentes donde transferir (Pagos, Fase 3)")
+    public ResponseEntity<DatosRecaudoResponse> datosRecaudo() {
+        return ResponseEntity.ok(finanzas.recaudoVigente());
     }
 }

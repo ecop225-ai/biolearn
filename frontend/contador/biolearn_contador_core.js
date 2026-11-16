@@ -159,6 +159,7 @@ const NAV = [
   { key:'facturas', label:'Facturas', icon:'receipt' },
   { key:'reembolsos', label:'Reembolsos', icon:'undo' },
   { key:'reportes', label:'Reportes', icon:'chart' },
+  { key:'datos', label:'Facturación y recaudo', icon:'receipt' },
   { group:'Cuenta' },
   { key:'mensajeria', label:'Mensajería', icon:'send' },
   { key:'perfil', label:'Mi perfil', icon:'user' },
@@ -233,6 +234,7 @@ function render() {
   const renderers = {
     inicio: renderInicio, pagos: renderPagos, facturas: renderFacturas, reembolsos: renderReembolsos,
     reportes: renderReportes, mensajeria: renderMensajeria, perfil: renderPerfil,
+    datos: typeof renderDatosFinancieros === 'function' ? renderDatosFinancieros : renderInicio,
   };
   (renderers[CURRENT] || renderInicio)(cont);
 }

@@ -2,6 +2,7 @@ package co.biolearn.repository;
 
 import co.biolearn.model.Factura;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.time.LocalDateTime;
 
 import java.util.List;
 import java.util.Optional;
@@ -13,4 +14,6 @@ public interface FacturaRepository extends JpaRepository<Factura, Integer> {
     List<Factura> findAllByOrderByFechaEmisionDesc();
 
     List<Factura> findByEstudiante_IdOrderByFechaEmisionDesc(Integer idEstudiante);
+
+    List<Factura> findByFechaEmisionBetweenOrderByFechaEmisionAsc(LocalDateTime desde, LocalDateTime hasta);
 }
