@@ -42,12 +42,36 @@ function finValor(v, tipo) {
     case 'moneda': return finMoneda(v);
     case 'numero': return finNumero(v);
     case 'porcentaje': return finPct(v);
-    case 'fecha': return finFecha(v);
+    case 'fecha': return finFechaCorta(v);
     default: return finEsc(v);
   }
 }
 function finHoy() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function finInicioMes() { return finHoy().slice(0, 8) + '01'; }
+
+/* Dirección con la ciudad, sin repetirla si ya está escrita (igual que FinanzasServiceImpl.direccionCompleta) */
+function finDireccion(d) {
+  const dir = d.direccion || '', ciudad = d.ciudad || '';
+  if (!ciudad || dir.toLowerCase().includes(ciudad.toLowerCase())) return dir;
+  return dir ? dir + ', ' + ciudad : ciudad;
+}
+
+/* Fecha corta para las tablas del reporte: 15/11/2026 18:18 (las columnas no se parten en varias líneas) */
+function finFechaCorta(iso) {
+  const d = new Date(String(iso).length === 10 ? iso + 'T00:00:00' : iso);
+  if (isNaN(d.getTime())) return finEsc(iso);
+  const p = n => String(n).padStart(2, '0');
+  const f = p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear();
+  return String(iso).length === 10 ? f : f + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+/* Las tarjetas del Inicio abren la sección con el filtro que corresponde (pagos:pendiente, reembolsos:aprobado…) */
+function finIrA(destino) {
+  const [seccion, estado] = destino.split(':');
+  if (estado && seccion === 'pagos' && typeof CP_FILTRO !== 'undefined') CP_FILTRO.estado = estado;
+  if (estado && seccion === 'reembolsos' && typeof CR_FILTRO !== 'undefined') CR_FILTRO.estado = estado;
+  goTo(seccion);
+}
 
 /* ================================================================ INICIO DEL CONTADOR */
 async function finRenderInicio(cont, nombre, cargo) {
@@ -57,7 +81,7 @@ async function finRenderInicio(cont, nombre, cargo) {
   catch (err) { cont.innerHTML = '<div class="empty-state">' + finEsc(err.message) + '</div>'; return; }
   const mesNombre = new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
   const tarjeta = (id, titulo, valor, detalle, color, destino) =>
-    '<div class="card fin-tarjeta" id="' + id + '"' + (destino ? ' onclick="goTo(\'' + destino + '\')" style="cursor:pointer"' : '') + '>' +
+    '<div class="card fin-tarjeta" id="' + id + '"' + (destino ? ' onclick="finIrA(\'' + destino + '\')" style="cursor:pointer"' : '') + '>' +
     '<div class="text-sm" style="font-weight:700;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px">' + titulo + '</div>' +
     '<div class="fin-valor" style="font-family:\'Fraunces\',serif;font-size:26px;color:' + (color || 'var(--ink)') + '">' + valor + '</div>' +
     '<div class="text-sm muted" style="margin-top:2px">' + detalle + '</div></div>';
@@ -67,9 +91,9 @@ async function finRenderInicio(cont, nombre, cargo) {
     '<div style="text-align:right"><div style="font-size:12px;opacity:.8">Ingresos netos del mes</div><div id="fin-neto-mes" style="font-family:\'Fraunces\',serif;font-size:30px;color:#8CE0A8">' + finMoneda(r.netoMes) + '</div></div></div>';
   html += '<div class="fin-grid-4 mb-26">' +
     tarjeta('fin-t-ingresos', 'Ingresos del mes', finMoneda(r.ingresosMes), r.pagosMes + ' pago' + (r.pagosMes === 1 ? '' : 's') + ' aprobado' + (r.pagosMes === 1 ? '' : 's') + ' · ' + finMoneda(r.reembolsadoMes) + ' devuelto', 'var(--sage)') +
-    tarjeta('fin-t-transferencias', 'Transferencias por confirmar', r.transferenciasPorConfirmar, 'Con comprobante adjunto →', 'var(--amber)', 'pagos') +
-    tarjeta('fin-t-revisar', 'Reembolsos por revisar', r.reembolsosPorRevisar, 'Solicitudes con avance →', 'var(--clay)', 'reembolsos') +
-    tarjeta('fin-t-devolver', 'Reembolsos por devolver', r.reembolsosPorDevolver, finMoneda(r.montoPorDevolver) + ' a cuentas o Nequi →', 'var(--blue)', 'reembolsos') + '</div>';
+    tarjeta('fin-t-transferencias', 'Transferencias por confirmar', r.transferenciasPorConfirmar, 'Con comprobante adjunto →', 'var(--amber)', 'pagos:pendiente') +
+    tarjeta('fin-t-revisar', 'Reembolsos por revisar', r.reembolsosPorRevisar, 'Solicitudes con avance →', 'var(--clay)', 'reembolsos:solicitado') +
+    tarjeta('fin-t-devolver', 'Reembolsos por devolver', r.reembolsosPorDevolver, finMoneda(r.montoPorDevolver) + ' a cuentas o Nequi →', 'var(--blue)', 'reembolsos:aprobado') + '</div>';
 
   const max = Math.max(1, ...r.ultimosMeses.map(m => Math.max(Number(m.ingresos), Number(m.reembolsos))));
   html += '<div class="flex gap-18 flex-wrap mb-26"><div class="card" style="flex:1.4;min-width:340px"><div class="flex justify-between items-center mb-18">' +
@@ -192,7 +216,7 @@ function finReporteHTML(r) {
   const fila = (vals, cols, total) => '<tr' + (total ? ' style="background:#E4EEE9;font-weight:700"' : '') + '>' + vals.map((v, i) => {
     const t = cols[i].tipo, num = t === 'moneda' || t === 'numero' || t === 'porcentaje';
     const texto = total && typeof v === 'string' && t !== 'texto' && !/^\d{4}-\d{2}-\d{2}/.test(v) && isNaN(Number(v));
-    return '<td style="padding:6px 8px;border-bottom:1px solid #E0E2E8;' + (num ? 'text-align:right;white-space:nowrap' : '') + '">' + (texto ? finEsc(v) : finValor(v, t)) + '</td>';
+    return '<td style="padding:6px 8px;border-bottom:1px solid #E0E2E8;' + (num ? 'text-align:right;white-space:nowrap' : t === 'fecha' ? 'white-space:nowrap' : '') + '">' + (texto ? finEsc(v) : finValor(v, t)) + '</td>';
   }).join('') + '</tr>';
   let h = '<div id="fin-documento" style="background:#fff;border:1px solid #E0E2E8;border-radius:14px;padding:28px;font-family:Inter,Arial,sans-serif;color:#2A2118;font-size:12.5px">' +
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2C4A42;padding-bottom:14px;margin-bottom:18px;gap:16px">' +
@@ -235,7 +259,7 @@ function finImprimir() {
   const w = window.open('');
   if (!w) { finAviso('Habilita las ventanas emergentes para imprimir', true); return; }
   w.document.write('<html><head><title>' + finEsc(r.titulo + ' ' + r.desde + ' a ' + r.hasta) + '</title>' +
-    '<style>@page{size:landscape;margin:12mm}body{margin:0;padding:16px;background:#fff}tr{page-break-inside:avoid}</style></head><body>' + finReporteHTML(r) + '</body></html>');
+    '<style>@page{size:landscape;margin:0}body{margin:0;padding:12mm;background:#fff}tr{page-break-inside:avoid}</style></head><body>' + finReporteHTML(r) + '</body></html>');
   w.document.close(); w.focus(); w.print();
 }
 
@@ -313,7 +337,7 @@ async function finHistorial(cual) {
     const cab = cual === 'facturacion' ? ['Vigente desde', 'Razón social', 'NIT', 'Dirección', 'Guardó'] : ['Vigente desde', 'Banco', 'Cuenta', 'Titular', 'Nequi', 'Guardó'];
     const filas = lista.map(v => '<tr' + (v.vigente ? ' style="background:var(--sage-soft,#E4EEE9)"' : '') + '><td>' + finFecha(v.actualizadoEn) + (v.vigente ? ' <span class="pill pill-verde">Vigente</span>' : '') + '</td>' +
       (cual === 'facturacion'
-        ? '<td>' + finEsc(v.razonSocial) + '</td><td>' + finEsc(v.nit) + '</td><td>' + finEsc([v.direccion, v.ciudad].filter(Boolean).join(', ')) + '</td>'
+        ? '<td>' + finEsc(v.razonSocial) + '</td><td>' + finEsc(v.nit) + '</td><td>' + finEsc(finDireccion(v)) + '</td>'
         : '<td>' + finEsc(v.banco) + '</td><td>' + finEsc(v.tipoCuenta + ' ' + v.numeroCuenta) + '</td><td>' + finEsc(v.titular) + '</td><td>' + finEsc(v.telefonoNequi || '—') + '</td>') +
       '<td>' + finEsc(v.actualizadoPor || 'Registro inicial') + '</td></tr>').join('');
     document.getElementById('fin-h-cuerpo').innerHTML = '<div class="tabla-wrap"><table><thead><tr>' + cab.map(c => '<th>' + c + '</th>').join('') + '</tr></thead><tbody>' + filas + '</tbody></table></div>';
