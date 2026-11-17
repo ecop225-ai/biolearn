@@ -16,7 +16,11 @@ ALTER TABLE datos_facturacion
   ADD COLUMN id_usuario_actualizo INT UNSIGNED NULL AFTER logo_url,
   ADD CONSTRAINT fk_datos_facturacion_usuario FOREIGN KEY (id_usuario_actualizo) REFERENCES usuario (id_usuario);
 
+-- MySQL Workbench bloquea los UPDATE sin llave primaria en el WHERE (safe update mode, error 1175):
+-- se desactiva solo para esta instrucción.
+SET SQL_SAFE_UPDATES = 0;
 UPDATE datos_facturacion SET ciudad = 'Medellín' WHERE ciudad IS NULL;
+SET SQL_SAFE_UPDATES = 1;
 
 CREATE TABLE datos_recaudo (
   id_datos_recaudo     INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

@@ -57,13 +57,16 @@ class FinanzasIntegracionTest {
 
     @Test @DisplayName("Una versión nueva de los datos de facturación queda vigente con su autor y sus columnas nuevas")
     void versionFacturacion() {
+        // biolearn_test solo tiene la estructura: se crea primero una versión anterior (de ayer)
+        db.update("INSERT INTO datos_facturacion (razon_social, nit, direccion, actualizado_en) VALUES ('BioLearn Anterior S.A.S.', '901000000-0', 'Calle 10 # 20-30', NOW() - INTERVAL 1 DAY)");
         DatosFacturacion nueva = datosFacturacionRepository.saveAndFlush(DatosFacturacion.builder().razonSocial("BioLearn IT S.A.S.").nit("901999999-1")
                 .direccion("Calle 1 # 2-3").ciudad("Cali").correo("it@biolearn.co").telefono("602 111 2233").actualizadoPor(contador).build());
         DatosFacturacion vigente = datosFacturacionRepository.findFirstByOrderByActualizadoEnDescIdDesc().orElseThrow();
         assertThat(vigente.getId()).isEqualTo(nueva.getId());
         assertThat(db.queryForObject("SELECT id_usuario_actualizo FROM datos_facturacion WHERE id_datos_facturacion = ?", Integer.class, nueva.getId()))
                 .isEqualTo(contador.getId());
-        assertThat(datosFacturacionRepository.findAllByOrderByActualizadoEnDescIdDesc()).hasSizeGreaterThanOrEqualTo(2);
+        assertThat(datosFacturacionRepository.findAllByOrderByActualizadoEnDescIdDesc()).hasSizeGreaterThanOrEqualTo(2)
+                .first().extracting(DatosFacturacion::getId).isEqualTo(nueva.getId());
     }
 
     @Test @DisplayName("Datos de recaudo: la versión nueva queda vigente; un tipo de cuenta inventado se rechaza")

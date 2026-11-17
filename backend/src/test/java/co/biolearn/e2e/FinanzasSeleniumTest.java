@@ -94,7 +94,7 @@ class FinanzasSeleniumTest {
     void cpFI01_inicioConDatosReales() {
         entrarComo(CONTADOR_USUARIO, CONTADOR_CLAVE, URL_CONTADOR, "BioLearn — Contador");
         espera.until(ExpectedConditions.visibilityOfElementLocated(By.id("fin-t-ingresos")));
-        assertThat(texto("fin-t-ingresos")).contains("Ingresos del mes").contains("$");
+        assertThat(texto("fin-t-ingresos")).containsIgnoringCase("Ingresos del mes").contains("$");   // la etiqueta se muestra en mayúsculas (CSS)
         assertThat(texto("fin-t-transferencias")).containsPattern("\\d");
         assertThat(texto("fin-t-revisar")).containsPattern("\\d");
         assertThat(texto("fin-t-devolver")).containsPattern("\\d");
