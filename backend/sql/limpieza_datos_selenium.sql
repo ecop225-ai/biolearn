@@ -8,7 +8,7 @@
 --   Instituciones → "Colegio Selenium …"                       (InstitucionesCatalogos y CP-U18)
 --   Grados        → "Grado Selenium …"                         (InstitucionesCatalogosSeleniumTest)
 --   Áreas         → "Área Selenium …"                          (InstitucionesCatalogosSeleniumTest)
---   Cursos        → "Curso Selenium …"                         (CursosSeleniumTest, EstudianteSeleniumTest y PagoSeleniumTest,
+--   Cursos        → "Curso Selenium …"                         (CursosSeleniumTest, EstudianteSeleniumTest, AccesoSeleniumTest y PagoSeleniumTest,
 --                   con sus inscripciones, pagos, facturas, reembolsos y notas crédito)
 --
 -- Uso en MySQL Workbench:
@@ -71,6 +71,9 @@ DELETE FROM notificacion     WHERE tipo = 'pago' AND entidad_id IN (SELECT id_pa
 DELETE FROM pago_inscripcion WHERE id_pago IN (SELECT id_pago FROM tmp_pagos_prueba);
 DELETE FROM pago             WHERE id_pago IN (SELECT id_pago FROM tmp_pagos_prueba);
 DROP TEMPORARY TABLE tmp_pagos_prueba;
+-- Acceso por tiempo: avisos de plazo y repaso de las inscripciones de los cursos de prueba
+DELETE n FROM notificacion n JOIN inscripcion i ON n.tipo = 'inscripcion' AND n.entidad_id = i.id_inscripcion
+  JOIN curso c ON c.id_curso = i.id_curso WHERE c.nombre LIKE 'Curso Selenium %';
 -- Fase 3: inscripciones de los cursos de prueba (su progreso se borra en cascada)
 DELETE i FROM inscripcion i JOIN curso c ON c.id_curso = i.id_curso WHERE c.nombre LIKE 'Curso Selenium %';
 DELETE hc FROM horario_curso hc JOIN curso c ON c.id_curso = hc.id_curso WHERE c.nombre LIKE 'Curso Selenium %';

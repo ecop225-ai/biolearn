@@ -28,6 +28,9 @@ public class LeccionEstudianteResponse {
     /** Porcentaje del curso completo (para la barra de avance). */
     private BigDecimal porcentajeCurso;
     private String estadoInscripcion;
+    /** Curso completado en repaso (solo lectura) y fecha en que termina. */
+    private boolean modoRepaso;
+    private LocalDateTime repasoHasta;
     /** Solo en el detalle: materiales y recursos activos, con «visto». */
     private List<MaterialEstudiante> materiales;
 

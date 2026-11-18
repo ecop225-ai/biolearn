@@ -10,7 +10,7 @@
    Cada portal define FIN.pedir (su función para llamar la API) antes de usarlo.
 ================================================================ */
 const FIN = {
-  base: 'http://localhost:8080',
+  base: (['localhost', '127.0.0.1', ''].includes(location.hostname) ? 'http://localhost:8080' : location.origin),   // ver despliegue/README.md
   pedir: null,              // function (metodo, ruta, cuerpo) → Promise<JSON>; la define cada portal
   aviso: null,              // function (texto, esError); por defecto usa toast() del portal
   reporte: null,            // último reporte generado (vista imprimible)

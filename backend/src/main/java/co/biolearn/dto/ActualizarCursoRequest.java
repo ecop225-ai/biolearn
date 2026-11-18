@@ -35,6 +35,16 @@ public class ActualizarCursoRequest {
     @Max(value = 10000, message = "Las horas estimadas no pueden superar 10000")
     private Integer horasEstimadas;
 
+    /** Acceso por tiempo: meses para terminar desde que se activa la inscripción (12 si no se indica). */
+    @Min(value = 1, message = "Los meses para terminar deben estar entre 1 y 36")
+    @Max(value = 36, message = "Los meses para terminar deben estar entre 1 y 36")
+    private Integer mesesParaTerminar;
+
+    /** Meses de repaso (solo lectura) después de completar el curso (6 si no se indica; 0 = sin repaso). */
+    @Min(value = 0, message = "Los meses de repaso deben estar entre 0 y 24")
+    @Max(value = 24, message = "Los meses de repaso deben estar entre 0 y 24")
+    private Integer mesesRepaso;
+
     @Size(max = 500, message = "La URL de la portada no puede superar 500 caracteres")
     @Pattern(regexp = "^$|^https?://\\S+$", message = "La portada debe ser una URL que empiece por http:// o https://")
     private String imagenPortada;

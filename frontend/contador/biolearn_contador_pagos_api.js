@@ -10,7 +10,10 @@
      «Emitir factura manual»: cada factura nace de un pago aprobado.
    Se carga al final de biolearn_contador_prototipo.html.
 ================================================================ */
-const API_BASE_CONT = 'http://localhost:8080';
+/* URL del backend: en el equipo de desarrollo (localhost, 127.0.0.1 o archivo abierto directamente) es el backend
+   de IntelliJ en el puerto 8080; en el servidor, Apache publica el sitio y reenvía /api al backend, así que se usa
+   la misma dirección del sitio (despliegue/README.md). */
+const API_BASE_CONT = (['localhost', '127.0.0.1', ''].includes(location.hostname) ? 'http://localhost:8080' : location.origin);
 let CP_FILTRO = { estado: 'pendiente', medio: '', busqueda: '', desde: '', hasta: '' };
 let CP_PAGOS = [];
 let CF_FILTRO = { busqueda: '', desde: '', hasta: '' };

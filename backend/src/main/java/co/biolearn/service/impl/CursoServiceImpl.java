@@ -93,6 +93,8 @@ public class CursoServiceImpl implements CursoService {
                 .soloInstitucional(Boolean.TRUE.equals(request.getSoloInstitucional()))
                 .creditos(request.getCreditos() != null ? request.getCreditos() : 0)
                 .horasEstimadas(request.getHorasEstimadas())
+                .mesesParaTerminar(request.getMesesParaTerminar() != null ? request.getMesesParaTerminar() : 12)
+                .mesesRepaso(request.getMesesRepaso() != null ? request.getMesesRepaso() : 6)
                 .imagenPortada(limpiar(request.getImagenPortada()))
                 .adminCreador(idUsuarioAdmin != null ? perfilAdminRepository.findByUsuario_Id(idUsuarioAdmin).orElse(null) : null)
                 .estado(BORRADOR) // siempre nace en borrador: publicar es una decisión aparte
@@ -123,6 +125,9 @@ public class CursoServiceImpl implements CursoService {
         if (request.getSoloInstitucional() != null) curso.setSoloInstitucional(request.getSoloInstitucional());
         if (request.getCreditos() != null) curso.setCreditos(request.getCreditos());
         if (request.getHorasEstimadas() != null) curso.setHorasEstimadas(request.getHorasEstimadas());
+        // Acceso por tiempo: el cambio aplica a los plazos que empiecen después; los vigentes conservan su fecha
+        if (request.getMesesParaTerminar() != null) curso.setMesesParaTerminar(request.getMesesParaTerminar());
+        if (request.getMesesRepaso() != null) curso.setMesesRepaso(request.getMesesRepaso());
         if (request.getImagenPortada() != null) curso.setImagenPortada(limpiar(request.getImagenPortada()));
         if (request.getIdDocenteTitular() != null) {
             PerfilDocente nuevo = buscarDocenteActivo(request.getIdDocenteTitular());
@@ -444,6 +449,7 @@ public class CursoServiceImpl implements CursoService {
                 .soloInstitucional(Boolean.TRUE.equals(c.getSoloInstitucional()))
                 .codigo(c.getCodigo()).color(c.getColor()).infoEstudiante(c.getInfoEstudiante())
                 .horasEstimadas(c.getHorasEstimadas()).estado(c.getEstado())
+                .mesesParaTerminar(c.getMesesParaTerminar()).mesesRepaso(c.getMesesRepaso())
                 .idArea(c.getArea().getId()).area(c.getArea().getNombre())
                 .idGrado(c.getGrado().getId()).grado(c.getGrado().getNombre())
                 .idDocenteTitular(t != null ? t.getUsuario().getId() : null)

@@ -1,0 +1,3 @@
+# Claves reales del servidor y respaldos de la base: nunca van al repositorio
+.env
+respaldos/

@@ -1,0 +1,6 @@
+# No copiar a la imagen del backend: compilados locales, archivos subidos ni la configuración con claves reales
+target/
+uploads/
+.idea/
+*.iml
+src/main/resources/application.properties

@@ -113,6 +113,13 @@ public class CorreoService {
                         "Consulta el detalle en «Mis pagos» de BioLearn."));
     }
 
+    /** Acceso por tiempo: aviso de 15 días, plazo vencido o repaso terminado. El mensaje llega ya escapado. */
+    public void avisoCurso(String correo, String nombre, String asunto, String mensajeHtml) {
+        enviar(correo, asunto + " · BioLearn",
+                plantilla("¡Hola, " + nombre + "!", "<p>" + mensajeHtml + "</p>", null, null,
+                        "Consulta tus cursos y sus fechas en «Mis cursos» de BioLearn."));
+    }
+
     // ── envío ───────────────────────────────────────────────────────────────
 
     /** Envía en segundo plano; sin configuración, solo deja el aviso en la consola. */

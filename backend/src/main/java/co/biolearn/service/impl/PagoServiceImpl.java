@@ -378,7 +378,8 @@ public class PagoServiceImpl implements PagoService {
 
     private static PagoResponse.Item item(Inscripcion i, BigDecimal monto) {
         Curso c = i.getCurso();
-        return PagoResponse.Item.builder().idInscripcion(i.getId()).idCurso(c.getId()).curso(c.getNombre()).codigoCurso(c.getCodigo()).monto(monto).build();
+        return PagoResponse.Item.builder().idInscripcion(i.getId()).idCurso(c.getId()).curso(c.getNombre()).codigoCurso(c.getCodigo()).monto(monto)
+                .renovacion("pendiente_pago".equals(i.getEstado()) && i.getAccesoDesde() != null).build();
     }
 
     private PagoResponse aPago(Pago p, boolean conEstudiante) {

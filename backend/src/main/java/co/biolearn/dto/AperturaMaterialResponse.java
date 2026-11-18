@@ -12,4 +12,6 @@ public class AperturaMaterialResponse {
     /** Segundos transcurridos desde la primera apertura. */
     private long segundosTranscurridos;
     private boolean visto;
+    /** Curso completado en repaso: solo lectura, el avance no cambia. */
+    private boolean modoRepaso;
 }

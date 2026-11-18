@@ -35,5 +35,7 @@ public class PagoResponse {
         private String curso;
         private String codigoCurso;
         private BigDecimal monto;
+        /** Acceso por tiempo: el curso ya tuvo un plazo y este pago lo renueva. */
+        private boolean renovacion;
     }
 }

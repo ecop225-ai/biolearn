@@ -86,6 +86,16 @@ public class Curso {
     @Column(name = "horas_estimadas")
     private Integer horasEstimadas;
 
+    /** Acceso por tiempo (migración 011): meses para terminar desde que se activa la inscripción (1 a 36). */
+    @Column(name = "meses_para_terminar", nullable = false)
+    @Builder.Default
+    private Integer mesesParaTerminar = 12;
+
+    /** Meses de repaso (solo lectura) desde que se completa el curso (0 a 24). */
+    @Column(name = "meses_repaso", nullable = false)
+    @Builder.Default
+    private Integer mesesRepaso = 6;
+
     @Column(name = "estado", nullable = false, length = 20)
     @Builder.Default
     private String estado = "borrador";

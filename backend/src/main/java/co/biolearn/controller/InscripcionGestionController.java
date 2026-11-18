@@ -2,6 +2,8 @@ package co.biolearn.controller;
 
 import co.biolearn.dto.CambiarEstadoRequest;
 import co.biolearn.dto.InscripcionResponse;
+import co.biolearn.dto.RevisionPlazosResponse;
+import co.biolearn.service.AccesoCursoService;
 import co.biolearn.security.CustomUserDetails;
 import co.biolearn.service.InscripcionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/** Inscritos de un curso con su avance (docentes del curso y Administrador) y suspensión de inscripciones (Administrador). */
+/** Inscritos de un curso con su avance (docentes del curso y Administrador), suspensión de inscripciones y revisión de plazos (Administrador). */
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -25,6 +27,7 @@ import java.util.List;
 public class InscripcionGestionController {
 
     private final InscripcionService servicio;
+    private final AccesoCursoService accesoCursoService;
 
     @GetMapping("/cursos/{idCurso}/inscripciones")
     @PreAuthorize("hasAnyRole('DOCENTE','ADMIN')")
@@ -38,5 +41,13 @@ public class InscripcionGestionController {
     @Operation(summary = "Suspende o reactiva una inscripción (estado: suspendida o activa)")
     public ResponseEntity<InscripcionResponse> estado(@PathVariable Integer id, @Valid @RequestBody CambiarEstadoRequest request) {
         return ResponseEntity.ok(servicio.cambiarEstado(id, request));
+    }
+
+    @PostMapping("/inscripciones/revision-plazos")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Revisa ya los plazos de acceso: vence los cursos sin terminar, cierra los repasos y envía los avisos de 15 días "
+            + "(la misma revisión corre todos los días a la 1:30 a. m.)")
+    public ResponseEntity<RevisionPlazosResponse> revisarPlazos() {
+        return ResponseEntity.ok(accesoCursoService.revisar(java.time.LocalDateTime.now()));
     }
 }

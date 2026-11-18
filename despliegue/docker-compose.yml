@@ -1,0 +1,89 @@
+# =====================================================================
+# BioLearn · Despliegue en un servidor Ubuntu con Docker (Azure, máquina vm-biolearn)
+#
+#   mysql   → MySQL 8.0 con la base biolearn_db (datos en el volumen mysql-datos)
+#   backend → API de Spring Boot construida desde ../backend (archivos subidos en el volumen archivos)
+#   apache  → Apache 2.4: publica el frontend en el puerto 80 y reenvía /api y Swagger al backend
+#
+# Solo Apache queda expuesto a Internet (puerto 80). MySQL y el backend no publican puertos:
+# se comunican por la red interna de Docker.
+# Las claves llegan desde el archivo .env (copia de .env.example), que NUNCA se sube a GitHub.
+#
+# Uso (dentro de la carpeta despliegue/):  docker compose up -d --build
+# =====================================================================
+name: biolearn
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Falta MYSQL_ROOT_PASSWORD en .env}
+      MYSQL_DATABASE: biolearn_db
+      MYSQL_USER: ${MYSQL_USER:-biolearn_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Falta MYSQL_PASSWORD en .env}
+      TZ: America/Bogota
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=256M     # la máquina tiene 4 GB: MySQL no necesita más para la demostración
+      - --performance-schema=OFF           # ahorra unos 200 MB de memoria
+    volumes:
+      - mysql-datos:/var/lib/mysql
+      - ./mysql:/docker-entrypoint-initdb.d:ro   # 01_biolearn.sql: solo se ejecuta la primera vez (volumen vacío)
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  backend:
+    build: ../backend
+    image: biolearn-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      TZ: America/Bogota
+      JAVA_OPTS: "-Xms256m -Xmx1024m"
+      # Base de datos (el nombre «mysql» es el servicio de arriba, dentro de la red de Docker)
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/biolearn_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Bogota"
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-biolearn_user}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "none"
+      SPRING_JPA_SHOW_SQL: "false"
+      # Seguridad
+      BIOLEARN_JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      BIOLEARN_JWT_EXPIRATION_MS: "28800000"
+      BIOLEARN_CORS_ALLOWED_ORIGIN: ${SITIO_URL:?Falta SITIO_URL en .env}
+      # Enlaces de los correos (activación, invitación, recuperación) → pantalla de Auth del servidor
+      BIOLEARN_FRONTEND_URL_AUTH: ${SITIO_URL}/prototipo-auth/biolearn_auth_prototipo.html
+      # Correo: apagado por defecto; los enlaces quedan en el registro del backend (docker compose logs backend)
+      BIOLEARN_CORREO_HABILITADO: ${CORREO_HABILITADO:-false}
+      SPRING_MAIL_HOST: smtp.gmail.com
+      SPRING_MAIL_PORT: "587"
+      SPRING_MAIL_USERNAME: ${CORREO_USUARIO:-}
+      SPRING_MAIL_PASSWORD: ${CORREO_CLAVE_APLICACION:-}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      # Archivos subidos (comprobantes y PDF de los cursos)
+      BIOLEARN_ARCHIVOS_RUTA: /app/uploads
+    volumes:
+      - archivos:/app/uploads
+
+  apache:
+    build: ./apache
+    image: biolearn-apache
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    volumes:
+      - ../frontend:/usr/local/apache2/htdocs:ro   # los portales se publican tal como están en el repositorio
+
+volumes:
+  mysql-datos:
+  archivos:

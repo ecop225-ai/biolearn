@@ -32,6 +32,9 @@ public class CursoEstudianteResponse {
     private Integer idInscripcion;
     private String estadoInscripcion;
     private BigDecimal porcentaje;
+    /** Acceso por tiempo: meses para terminar y de repaso del curso. */
+    private Integer mesesParaTerminar;
+    private Integer mesesRepaso;
     /** Solo en el detalle: los títulos de las lecciones activas, en orden. */
     private List<String> lecciones;
     /** Solo al buscar por código: la institución que contrató el curso. */

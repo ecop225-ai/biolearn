@@ -81,7 +81,7 @@ function pintarPorPagarEst() {
   items.forEach((i, k) => {
     html += '<label class="flex justify-between items-center pag-item" data-id="' + i.idInscripcion + '" data-curso="' + esc(i.curso) + '" style="padding:12px 0;cursor:pointer;' + (k ? 'border-top:1px solid var(--line)' : '') + '">' +
       '<span class="flex items-center gap-10"><input type="checkbox" ' + (PAG_SELECCION[i.idInscripcion] ? 'checked' : '') + ' onchange="PAG_SELECCION[' + i.idInscripcion + ']=this.checked;pintarPorPagarEst()">' +
-      '<span><span style="font-weight:700">' + esc(i.curso) + '</span><br><span class="text-sm muted" style="font-family:monospace">' + esc(i.codigoCurso || '') + '</span></span></span>' +
+      '<span><span style="font-weight:700">' + esc(i.curso) + '</span>' + (i.renovacion ? ' <span class="pill pill-azul est-renovacion" style="font-size:11px">🔄 Renovación</span>' : '') + '<br><span class="text-sm muted" style="font-family:monospace">' + esc(i.codigoCurso || '') + '</span></span></span>' +
       '<span style="font-weight:700">' + pesosEst(i.monto) + '</span></label>';
   });
   html += '</div></div><div style="flex:1;min-width:280px"><div class="card"><div class="text-sm mb-10" style="font-weight:700;text-transform:uppercase;color:var(--ink-soft)">Medio de pago</div>';

@@ -83,6 +83,12 @@ public class EstudianteController {
         return ResponseEntity.ok(servicio.retirarse(id, u.getUsuario()));
     }
 
+    @PatchMapping("/inscripciones/{id}/renovacion")
+    @Operation(summary = "Renovar un curso cuyo plazo venció (con precio queda pendiente de pago; gratuito se activa con un plazo nuevo)")
+    public ResponseEntity<InscripcionResponse> renovar(@PathVariable Integer id, @AuthenticationPrincipal CustomUserDetails u) {
+        return ResponseEntity.ok(servicio.renovar(id, u.getUsuario()));
+    }
+
     @GetMapping("/cursos/{idCurso}/lecciones")
     @Operation(summary = "Lecciones activas del curso con mi progreso y si están bloqueadas")
     public ResponseEntity<List<LeccionEstudianteResponse>> lecciones(@PathVariable Integer idCurso, @AuthenticationPrincipal CustomUserDetails u) {

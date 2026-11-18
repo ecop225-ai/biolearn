@@ -460,4 +460,109 @@ class InscripcionServiceImplTest {
             assertThat(InscripcionServiceImpl.bloqueada(l, Map.of())).isFalse();
         }
     }
+
+    // ── acceso por tiempo (migración 011) ──
+    @Nested @DisplayName("Acceso por tiempo")
+    class AccesoPorTiempo {
+
+        private final java.time.LocalDateTime ahora = java.time.LocalDateTime.now();
+
+        @Test @DisplayName("Inscripción gratuita: el plazo empieza ya y dura los meses del curso")
+        void plazoGratuito() {
+            gratis.setMesesParaTerminar(18);
+            InscripcionResponse r = servicio.inscribirse(new InscripcionRequest(10, null), estU);
+            assertThat(r.getAccesoHasta()).isBetween(ahora.plusMonths(18).minusMinutes(1), java.time.LocalDateTime.now().plusMonths(18).plusMinutes(1));
+            assertThat(r.getDiasRestantes()).isGreaterThan(500);
+            assertThat(r.getMesesParaTerminar()).isEqualTo(18);
+        }
+
+        @Test @DisplayName("Con precio el plazo no corre hasta el pago; el pago aprobado lo abre")
+        void plazoConPago() {
+            assertThat(servicio.inscribirse(new InscripcionRequest(11, null), estU).getAccesoHasta()).isNull();
+            Inscripcion i = inscripcion(pago, "pendiente_pago");
+            servicio.activarPorPago(i);
+            assertThat(i.getAccesoDesde()).isNotNull();
+            assertThat(i.getAccesoHasta()).isAfter(ahora.plusMonths(12).minusMinutes(1));
+        }
+
+        @Test @DisplayName("Plazo vencido: queda vencida, sin acceso, y no se puede retirar")
+        void vencida() {
+            Inscripcion i = inscripcion(gratis, "activa");
+            i.setAccesoHasta(ahora.minusDays(1));
+            assertThat(InscripcionServiceImpl.estadoVigente(i, ahora)).isEqualTo("vencida");
+            assertThatThrownBy(() -> servicio.lecciones(10, estU)).isInstanceOf(SinPermisoException.class).hasMessageContaining("venció").hasMessageContaining("renuévalo");
+            when(inscripcionRepository.findByEstudiante_IdOrderByFechaInscripcionDesc(9)).thenReturn(List.of(i));
+            assertThat(servicio.misInscripciones(estU).get(0).getEstado()).isEqualTo("vencida");
+            assertThatThrownBy(() -> servicio.retirarse(100, estU)).isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("venció");
+        }
+
+        @Test @DisplayName("Renovar con precio → pendiente de pago (renovación); el pago abre un plazo nuevo")
+        void renovarConPrecio() {
+            Inscripcion i = inscripcion(pago, "vencida");
+            i.setAccesoDesde(ahora.minusMonths(13)); i.setAccesoHasta(ahora.minusMonths(1));
+            InscripcionResponse r = servicio.renovar(100, estU);
+            assertThat(r.getEstado()).isEqualTo("pendiente_pago");
+            assertThat(r.isRenovacion()).isTrue();
+            servicio.activarPorPago(i);
+            assertThat(i.getEstado()).isEqualTo("activa");
+            assertThat(i.getAccesoHasta()).isAfter(ahora.plusMonths(11));
+        }
+
+        @Test @DisplayName("Renovar gratis activa con plazo nuevo; si no venció → 409; ajena → 403")
+        void renovarGratis() {
+            Inscripcion i = inscripcion(gratis, "activa");
+            i.setAccesoHasta(ahora.minusDays(2));
+            assertThat(servicio.renovar(100, estU).getEstado()).isEqualTo("activa");
+            assertThat(i.getAccesoHasta()).isAfter(ahora.plusMonths(11));
+            assertThatThrownBy(() -> servicio.renovar(100, estU)).isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("Solo se renueva");
+            assertThatThrownBy(() -> servicio.renovar(100, otroU)).isInstanceOf(SinPermisoException.class);
+        }
+
+        @Test @DisplayName("Inscribirse de nuevo en un curso vencido también lo renueva")
+        void inscribirseVencido() {
+            inscripcion(pago, "vencida");
+            assertThat(servicio.inscribirse(new InscripcionRequest(11, null), estU).getEstado()).isEqualTo("pendiente_pago");
+        }
+
+        @Test @DisplayName("Al completar empieza el repaso; en repaso abrir o marcar un material no cambia el avance")
+        void repaso() {
+            gratis.setMesesRepaso(3);
+            Inscripcion insc = inscripcion(gratis, "activa");
+            Leccion l = leccion(910, gratis, "activa", null);
+            progresos.add(ProgresoLeccion.builder().inscripcion(insc).leccion(l).estado("completada").porcentaje(new BigDecimal("100")).build());
+            servicio.actualizarCompletacion(insc);
+            assertThat(insc.getEstado()).isEqualTo("completada");
+            assertThat(insc.getRepasoHasta()).isEqualTo(insc.getFechaCompletacion().plusMonths(3));
+            MaterialContenido m = MaterialContenido.builder().id(70).leccion(l).tipo("lectura").estado("activo").build();
+            when(materialRepository.findById(70)).thenReturn(Optional.of(m));
+            when(contenidoService.aLeccion(l, true)).thenReturn(LeccionResponse.builder().materiales(List.of()).build());
+            AperturaMaterialResponse a = servicio.registrarApertura(70, estU);
+            assertThat(a.isModoRepaso()).isTrue();
+            LeccionEstudianteResponse r = servicio.marcarVisto(70, estU);
+            assertThat(r.isModoRepaso()).isTrue();
+            verify(progresoMaterialRepository, never()).save(any());
+            assertThat(insc.getEstado()).isEqualTo("completada");
+        }
+
+        @Test @DisplayName("Repaso terminado → cerrada: sin acceso, no se renueva ni se vuelve a inscribir")
+        void cerrada() {
+            Inscripcion i = inscripcion(gratis, "completada");
+            i.setFechaCompletacion(ahora.minusMonths(7)); i.setRepasoHasta(ahora.minusDays(3));
+            assertThat(InscripcionServiceImpl.estadoVigente(i, ahora)).isEqualTo("cerrada");
+            assertThatThrownBy(() -> servicio.lecciones(10, estU)).isInstanceOf(SinPermisoException.class).hasMessageContaining("El repaso de este curso terminó");
+            assertThatThrownBy(() -> servicio.renovar(100, estU)).isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("certificado");
+            assertThatThrownBy(() -> servicio.inscribirse(new InscripcionRequest(10, null), estU)).isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("terminó");
+        }
+
+        @Test @DisplayName("Curso congelado: reactivar una suspendida que ya estaba completada la deja completada con sus fechas")
+        void congelado() {
+            Inscripcion i = inscripcion(gratis, "suspendida");
+            java.time.LocalDateTime repaso = ahora.plusMonths(2);
+            i.setFechaCompletacion(ahora.minusDays(5)); i.setRepasoHasta(repaso);
+            CambiarEstadoRequest a = new CambiarEstadoRequest(); a.setEstado("activa");
+            servicio.cambiarEstado(100, a);
+            assertThat(i.getEstado()).isEqualTo("completada");
+            assertThat(i.getRepasoHasta()).isEqualTo(repaso);
+        }
+    }
 }

@@ -353,6 +353,8 @@ function iconSvg(name) { return ICONS[name] || ''; }
 
 function goTo(key) {
   document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+  // «Mis cursos» desde el menú vuelve a la lista aunque haya un curso o una lección abiertos
+  if (key === 'cursos' && typeof CURSO_ACTIVO !== 'undefined') { CURSO_ACTIVO = null; LECCION_ACTIVA = null; }
   CURRENT = key; render(); window.scrollTo(0,0);
 }
 

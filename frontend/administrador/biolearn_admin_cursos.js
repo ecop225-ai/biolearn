@@ -199,6 +199,9 @@ function renderModalCurso() {
     '<div class="campo"><label for="cur-creditos">Créditos</label><input type="number" id="cur-creditos" min="1" max="100"></div></div>' +
     '<div class="grid-2"><div class="campo"><label for="cur-horas">Horas estimadas</label><input type="number" id="cur-horas" min="1" max="10000"></div>' +
     '<div class="campo"><label for="cur-portada">Imagen de portada (URL)</label><input type="url" id="cur-portada" maxlength="500" placeholder="https://..."></div></div>' +
+    '<div class="grid-2"><div class="campo"><label for="cur-meses">Meses para terminar</label><input type="number" id="cur-meses" min="1" max="36" placeholder="12"></div>' +
+    '<div class="campo"><label for="cur-repaso">Meses de repaso</label><input type="number" id="cur-repaso" min="0" max="24" placeholder="6"></div></div>' +
+    '<p class="hint" style="margin:-6px 0 12px;font-size:11.5px;color:var(--ink-soft)">El plazo para terminar empieza cuando el curso se activa (pago aprobado o inscripción gratuita); al terminarlo queda en repaso, solo lectura. Un cambio aplica a los plazos que empiecen después.</p>' +
     '<label class="campo" style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="cur-solo-colegios" style="width:auto;margin-top:3px">' +
     '<span><strong>Solo para colegios</strong><br><span class="hint" style="margin:0">No aparece en el catálogo abierto: lo ven los estudiantes de los colegios que lo contraten y se inscriben con el código del colegio.</span></span></label>' +
     '<div class="campo"><label for="cur-descripcion">Descripción</label><textarea id="cur-descripcion" rows="3" placeholder="Requerida para publicar"></textarea></div>' +
@@ -227,6 +230,8 @@ function abrirModalCurso(id) {
   document.getElementById('cur-precio').value = c ? Number(c.precio || 0) : '';
   document.getElementById('cur-creditos').value = c && c.creditos ? c.creditos : '';
   document.getElementById('cur-horas').value = c && c.horasEstimadas ? c.horasEstimadas : '';
+  document.getElementById('cur-meses').value = c && c.mesesParaTerminar ? c.mesesParaTerminar : 12;
+  document.getElementById('cur-repaso').value = c && c.mesesRepaso != null ? c.mesesRepaso : 6;
   document.getElementById('cur-portada').value = c && c.imagenPortada ? c.imagenPortada : '';
   document.getElementById('cur-descripcion').value = c && c.descripcion ? c.descripcion : '';
   document.getElementById('cur-objetivos').value = c && c.objetivos ? c.objetivos : '';
@@ -241,6 +246,7 @@ async function guardarCurso() {
   const cuerpo = {
     nombre: val('cur-nombre'), idArea: num('cur-area'), idGrado: num('cur-grado'),
     precio: num('cur-precio'), creditos: num('cur-creditos'), horasEstimadas: num('cur-horas'),
+    mesesParaTerminar: num('cur-meses'), mesesRepaso: num('cur-repaso'),
     imagenPortada: val('cur-portada'), descripcion: val('cur-descripcion'), objetivos: val('cur-objetivos'),
     soloInstitucional: document.getElementById('cur-solo-colegios').checked
   };
@@ -300,7 +306,8 @@ function pintarDetalleCurso(c) {
   }
   html += fila('Estado', pillEstadoCurso(c.estado)) + fila('Área · Grado', esc(c.area) + ' · ' + esc(c.grado)) +
     fila('Docente titular', c.docenteTitular ? esc(c.docenteTitular) : 'Sin asignar') + fila('Precio', precioCOP(c.precio) + (c.soloInstitucional ? ' · <span class="pill pill-azul">🏫 Solo para colegios</span>' : '')) +
-    fila('Créditos · Horas', (c.creditos || '—') + ' · ' + (c.horasEstimadas || '—')) + fila('Creado por', esc(c.creadoPor) + ' · ' + esc(c.fechaCreacion || '')) +
+    fila('Créditos · Horas', (c.creditos || '—') + ' · ' + (c.horasEstimadas || '—')) +
+    fila('Plazo · Repaso', (c.mesesParaTerminar || 12) + ' meses para terminar · ' + (c.mesesRepaso != null ? c.mesesRepaso : 6) + ' de repaso') + fila('Creado por', esc(c.creadoPor) + ' · ' + esc(c.fechaCreacion || '')) +
     fila('Descripción', esc(c.descripcion || '—'));
 
   // Docentes
@@ -437,7 +444,16 @@ async function quitarInstitucionCurso(id, idInstitucion) {
 }
 
 /* ---------- Fase 3: código de inscripción e inscritos ---------- */
-const CUR_INSC_LABEL = { activa: 'activa', completada: 'completada', pendiente_pago: 'pendiente de pago', retirada: 'retirada', suspendida: 'suspendida' };
+const CUR_INSC_LABEL = { activa: 'activa', completada: 'completada · en repaso', pendiente_pago: 'pendiente de pago', retirada: 'retirada', suspendida: 'suspendida', en_reembolso: 'reembolso en trámite', vencida: 'plazo vencido', cerrada: 'cerrada' };
+/* Acceso por tiempo: hasta cuándo puede terminar o repasar */
+function plazoInscritoTexto(i) {
+  const f = iso => { if (!iso) return '—'; const d = new Date(iso); return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear(); };
+  if (i.estado === 'activa' && i.accesoHasta) return 'Hasta el ' + f(i.accesoHasta);
+  if (i.estado === 'completada' && i.repasoHasta) return 'Repaso hasta el ' + f(i.repasoHasta);
+  if (i.estado === 'vencida') return 'Venció el ' + f(i.accesoHasta);
+  if (i.estado === 'cerrada') return 'Repaso terminó el ' + f(i.repasoHasta);
+  return '—';
+}
 
 async function regenerarCodigoCurso(id, idInstitucion) {
   confirmarAccion('¿Generar un código de inscripción nuevo? El código anterior dejará de funcionar; quienes ya se inscribieron siguen vinculados.', async () => {
@@ -456,10 +472,11 @@ async function cargarInscritosCurso(id) {
     const lista = await pedirCurso('GET', '/api/cursos/' + id + '/inscripciones');
     if (!cont) return;
     if (!lista.length) { cont.innerHTML = '<p class="muted text-sm">Aún no hay estudiantes inscritos.</p>'; return; }
-    cont.innerHTML = '<div class="tabla-wrap"><table><thead><tr><th>Estudiante</th><th>Estado</th><th>Avance</th><th>Colegio (código)</th><th></th></tr></thead><tbody>' +
+    cont.innerHTML = '<div class="tabla-wrap"><table><thead><tr><th>Estudiante</th><th>Estado</th><th>Avance</th><th>Plazo</th><th>Colegio (código)</th><th></th></tr></thead><tbody>' +
       lista.map(i => '<tr class="curd-inscrito" data-correo="' + esc(i.correo) + '"><td><div style="font-weight:600">' + esc(i.estudiante) + '</div><div class="text-sm muted">' + esc(i.correo) + '</div></td>' +
         '<td>' + pill(i.estado === 'pendiente_pago' ? 'pendiente' : i.estado) + ' <span class="text-sm muted">' + esc(CUR_INSC_LABEL[i.estado] || i.estado) + '</span></td>' +
         '<td class="text-sm">' + Math.round(Number(i.porcentaje || 0)) + ' % · ' + i.leccionesCompletadas + ' de ' + i.totalLecciones + ' lecciones</td>' +
+        '<td class="text-sm curd-plazo">' + plazoInscritoTexto(i) + '</td>' +
         '<td class="text-sm">' + esc(i.institucion || '—') + '</td>' +
         '<td style="text-align:right;white-space:nowrap">' +
         (['activa', 'completada', 'pendiente_pago'].includes(i.estado) ? '<button class="btn btn-ghost btn-xs" onclick="estadoInscripcionAdmin(' + id + ',' + i.id + ',\'suspendida\')">Suspender</button>' : '') +

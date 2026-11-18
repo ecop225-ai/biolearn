@@ -9,7 +9,10 @@
      lección y del curso los calcula el servidor. Las lecciones con prerrequisito quedan bloqueadas.
    Las demás secciones del portal (actividades, evaluaciones, foros…) siguen con datos de demostración.
 ================================================================ */
-const API_BASE = 'http://localhost:8080';
+/* URL del backend: en el equipo de desarrollo (localhost, 127.0.0.1 o archivo abierto directamente) es el backend
+   de IntelliJ en el puerto 8080; en el servidor, Apache publica el sitio y reenvía /api al backend, así que se usa
+   la misma dirección del sitio (despliegue/README.md). */
+const API_BASE = (['localhost', '127.0.0.1', ''].includes(location.hostname) ? 'http://localhost:8080' : location.origin);
 let EST_CATALOGO = [];
 let EST_DETALLE = null;
 let EST_CODIGO = null;          // curso encontrado por código { curso, codigo }
@@ -50,9 +53,9 @@ async function pedirApiEst(metodo, ruta, cuerpo) {
 
 function urlEst(u) { return u && u.startsWith('/api/') ? API_BASE + u : u; }
 function precioEst(c) { return c.gratuito || !Number(c.precio) ? 'Gratuito' : '$' + Number(c.precio).toLocaleString('es-CO'); }
-const ESTADO_INSC_LABEL = { activa: 'Inscrito', completada: 'Completado', pendiente_pago: 'Pendiente de pago', retirada: 'Retirado', suspendida: 'Suspendida', en_reembolso: 'Reembolso en trámite' };
+const ESTADO_INSC_LABEL = { activa: 'Inscrito', completada: 'Completado', pendiente_pago: 'Pendiente de pago', retirada: 'Retirado', suspendida: 'Suspendida', en_reembolso: 'Reembolso en trámite', vencida: 'Plazo vencido', cerrada: 'Cerrado' };
 function pillInscripcion(e) {
-  const clase = { activa: 'pill-verde', completada: 'pill-azul', pendiente_pago: 'pill-ambar', retirada: 'pill-gris', suspendida: 'pill-clay', en_reembolso: 'pill-ambar' }[e] || 'pill-gris';
+  const clase = { activa: 'pill-verde', completada: 'pill-azul', pendiente_pago: 'pill-ambar', retirada: 'pill-gris', suspendida: 'pill-clay', en_reembolso: 'pill-ambar', vencida: 'pill-clay', cerrada: 'pill-gris' }[e] || 'pill-gris';
   return '<span class="pill ' + clase + '">' + esc(ESTADO_INSC_LABEL[e] || e) + '</span>';
 }
 function portadaEst(c, alto) {
@@ -166,6 +169,49 @@ async function buscarCodigoEst() {
   } catch (err) { toast(err.message, true); }
 }
 
+/* ================================================================
+   ACCESO POR TIEMPO (migración 011): plazo para terminar, repaso y renovación
+================================================================ */
+function fechaCortaEst(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso); if (isNaN(d)) return '—';
+  return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+}
+function diasTextoEst(n) { return n === 0 ? 'vence hoy' : n === 1 ? 'queda 1 día' : 'quedan ' + n + ' días'; }
+
+/* Detalle del catálogo: cuánto tiempo hay para terminar y para repasar */
+function plazoCursoHTML(c) {
+  const m = c.mesesParaTerminar || 12, r = c.mesesRepaso == null ? 6 : c.mesesRepaso;
+  return '<p class="text-sm mb-18" id="est-plazo-catalogo" style="background:var(--bone);border-radius:8px;padding:8px 10px;margin-top:0">🗓 Tienes <strong>' + m + ' meses</strong> para terminarlo desde que se active' +
+    (r > 0 ? ' y <strong>' + r + ' meses</strong> para repasarlo después de terminarlo.' : '.') + '</p>';
+}
+
+/* Mis cursos: fecha límite del curso activo o fin del repaso del completado */
+function plazoInscripcionHTML(i) {
+  if (i.estado === 'activa' && i.accesoHasta) {
+    const urgente = i.diasRestantes != null && i.diasRestantes <= 15;
+    return '<p class="text-sm est-plazo" style="margin:6px 0 0;color:' + (urgente ? 'var(--clay)' : 'var(--ink-soft)') + ';font-weight:' + (urgente ? '700' : '400') + '">' + (urgente ? '⚠️' : '⏳') + ' Termina antes del ' + fechaCortaEst(i.accesoHasta) + ' · ' + diasTextoEst(i.diasRestantes) + '</p>';
+  }
+  if (i.estado === 'completada' && i.repasoHasta)
+    return '<p class="text-sm est-plazo" style="margin:6px 0 0;color:var(--ink-soft)">📘 Repaso hasta el ' + fechaCortaEst(i.repasoHasta) + ' · ' + diasTextoEst(i.diasRestantes) + '</p>';
+  return '';
+}
+
+function bannerRepasoHTML(hasta) {
+  return '<div class="card mb-14" id="est-modo-repaso" style="background:var(--blue-soft);border-left:4px solid var(--blue);box-shadow:none;padding:12px 14px">📘 <strong>Modo repaso' + (hasta ? ' hasta el ' + fechaCortaEst(hasta) : '') + '.</strong> Ya completaste este curso: puedes volver a ver todo el contenido; tu avance no cambia.</div>';
+}
+
+function renovarEst(id, nombre, gratuito) {
+  confirmarAccion('¿Renovar <strong>' + esc(nombre) + '</strong>? ' + (gratuito ? 'Tendrás un plazo nuevo para terminarlo y conservas tu avance.'
+      : 'El curso pasará a tu carrito; al confirmarse el pago tendrás un plazo nuevo para terminarlo y conservas tu avance.'), async function () {
+    try {
+      const r = await pedirApiEst('PATCH', '/api/estudiante/inscripciones/' + id + '/renovacion');
+      if (r.estado === 'activa') { toast('Renovaste "' + nombre + '": tienes hasta el ' + fechaCortaEst(r.accesoHasta) + ' para terminarlo'); CATALOGO_DETALLE = null; goTo('cursos'); }
+      else { toast('"' + nombre + '" está en tu carrito: págalo para seguir'); CATALOGO_DETALLE = null; goTo('pagos'); }
+    } catch (err) { toast(err.message, true); }
+  }, 'Renovar');
+}
+
 function renderCatalogoDetalle(cont) {
   cont.innerHTML = '<button class="btn btn-ghost" onclick="volverAlCatalogo()" style="margin-bottom:16px">← Volver al catálogo</button><div id="est-detalle">Cargando...</div>';
   const cargar = EST_CODIGO && EST_CODIGO.curso.id === CATALOGO_DETALLE ? Promise.resolve(EST_CODIGO.curso) : pedirApiEst('GET', '/api/estudiante/catalogo/' + CATALOGO_DETALLE);
@@ -187,10 +233,13 @@ function pintarDetalleEst(c) {
     '<div class="card"><h3 style="font-size:15px;margin:0 0 8px">Temario</h3>' + (c.lecciones && c.lecciones.length ? '<ul style="margin:0;padding-left:20px;font-size:13.5px;line-height:1.9">' + c.lecciones.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul>' : '<p class="text-sm muted">El temario se publicará pronto.</p>') + '</div></div>';
   html += '<div style="flex:1;min-width:260px"><div class="card">' +
     '<div style="font-size:26px;font-weight:800;color:var(--blue-deep);margin-bottom:14px">' + precioEst(c) + '</div>' +
-    '<div class="flex gap-14 text-sm muted mb-18" style="flex-wrap:wrap"><span>📖 ' + c.totalLecciones + ' lecciones</span>' + (c.horasEstimadas ? '<span>⏱ ' + c.horasEstimadas + ' h</span>' : '') + (c.creditos ? '<span>🎓 ' + c.creditos + ' créditos</span>' : '') + '</div>';
+    '<div class="flex gap-14 text-sm muted mb-8" style="flex-wrap:wrap"><span>📖 ' + c.totalLecciones + ' lecciones</span>' + (c.horasEstimadas ? '<span>⏱ ' + c.horasEstimadas + ' h</span>' : '') + (c.creditos ? '<span>🎓 ' + c.creditos + ' créditos</span>' : '') + '</div>' +
+    plazoCursoHTML(c);
   if (inscrito) {
     html += '<div class="mb-8">' + pillInscripcion(c.estadoInscripcion) + '</div>' +
-      (c.estadoInscripcion === 'activa' || c.estadoInscripcion === 'completada' ? '<button class="btn btn-primary w-full" style="justify-content:center" onclick="goTo(\'cursos\');abrirCurso(' + c.id + ')">Ir al curso</button>' : '');
+      (c.estadoInscripcion === 'activa' || c.estadoInscripcion === 'completada' ? '<button class="btn btn-primary w-full" style="justify-content:center" onclick="goTo(\'cursos\');abrirCurso(' + c.id + ')">' + (c.estadoInscripcion === 'completada' ? 'Repasar el curso' : 'Ir al curso') + '</button>' : '') +
+      (c.estadoInscripcion === 'vencida' ? '<p class="text-sm muted">El plazo para terminar este curso venció. Conservas tu avance.</p><button class="btn btn-primary w-full est-btn-renovar" style="justify-content:center" onclick="renovarEst(' + c.idInscripcion + ',\'' + esc(c.nombre).replace(/'/g, '') + '\',' + !!c.gratuito + ')">🔄 Renovar ' + (c.gratuito ? 'gratis' : '(' + precioEst(c) + ')') + '</button>' : '') +
+      (c.estadoInscripcion === 'cerrada' ? '<p class="text-sm muted">Terminaste este curso y su repaso; conservas tu certificado y tus notas.</p>' : '');
   } else if (c.soloInstitucional && !conCodigo) {
     html += '<div class="card mb-8" id="est-solo-institucional" style="background:var(--blue-soft);box-shadow:none;padding:12px 14px">🏫 Este curso es solo para colegios. Inscríbete con el código de inscripción que te dio tu colegio.</div>' +
       '<button class="btn btn-primary w-full" style="justify-content:center" onclick="pedirCodigoEst()">Escribir mi código</button>';
@@ -271,7 +320,8 @@ const FILTROS_MIS_CURSOS = [
   ['todos', 'Todos', i => i.estado !== 'retirada'],
   ['progreso', 'En curso', i => i.estado === 'activa'],
   ['pagar', 'Por pagar', i => i.estado === 'pendiente_pago'],
-  ['terminados', 'Terminados', i => i.estado === 'completada'],
+  ['terminados', 'Terminados', i => i.estado === 'completada' || i.estado === 'cerrada'],
+  ['vencidos', 'Vencidos', i => i.estado === 'vencida'],
   ['colegio', 'De mi colegio', i => !!i.institucion && i.estado !== 'retirada'],
   ['pausa', 'En pausa', i => i.estado === 'en_reembolso' || i.estado === 'suspendida'],
   ['retirados', 'Retirados', i => i.estado === 'retirada'],
@@ -292,16 +342,19 @@ function pintarMisCursosEst() {
   let html = visibles.map(i => {
     const pct = Math.round(Number(i.porcentaje || 0));
     const conAcceso = i.estado === 'activa' || i.estado === 'completada';
-    const color = i.estado === 'completada' ? 'var(--amber)' : pct > 0 ? 'var(--sage)' : 'var(--blue)';
-    const etapa = i.estado === 'completada' ? 'Completado' : i.estado === 'pendiente_pago' ? 'Pendiente de pago' : i.estado === 'suspendida' ? 'Suspendida' : i.estado === 'en_reembolso' ? 'En pausa' : i.estado === 'retirada' ? 'Retirado' : pct > 0 ? 'En progreso' : 'Por comenzar';
+    const color = i.estado === 'completada' ? 'var(--amber)' : i.estado === 'vencida' ? 'var(--clay)' : pct > 0 ? 'var(--sage)' : 'var(--blue)';
+    const etapa = i.estado === 'completada' ? 'Completado · en repaso' : i.estado === 'cerrada' ? 'Completado' : i.estado === 'vencida' ? 'Plazo vencido'
+      : i.estado === 'pendiente_pago' ? (i.renovacion ? 'Renovación por pagar' : 'Pendiente de pago') : i.estado === 'suspendida' ? 'Suspendida' : i.estado === 'en_reembolso' ? 'En pausa' : i.estado === 'retirada' ? 'Retirado' : pct > 0 ? 'En progreso' : 'Por comenzar';
     return '<div class="card est-mi-curso" data-nombre="' + esc(i.curso) + '" data-estado="' + i.estado + '" ' + (conAcceso ? 'onclick="abrirCurso(' + i.idCurso + ')" style="cursor:pointer;' : 'style="opacity:.8;') + 'border-top:4px solid ' + color + '">' +
       '<div class="flex justify-between items-start mb-14"><span style="font-size:30px">🧬</span>' + pillInscripcion(i.estado) + '</div>' +
       '<div class="text-sm" style="font-weight:700;color:var(--ink-soft);text-transform:uppercase;margin-bottom:4px">' + etapa + '</div>' +
       '<h3 style="font-size:17px;margin:0 0 4px">' + esc(i.curso) + '</h3>' +
       (i.codigoCurso ? '<div class="text-sm mb-4" style="font-family:monospace;font-weight:700;color:' + color + '">' + esc(i.codigoCurso) + '</div>' : '') +
       '<p class="text-sm muted mb-14">' + i.leccionesCompletadas + ' de ' + i.totalLecciones + ' lecciones' + (i.institucion ? ' · 🏫 ' + esc(i.institucion) : '') + '</p>' +
-      (conAcceso ? '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%;background:' + color + '"></div></div><p class="text-sm" style="color:' + color + ';font-weight:700;margin:6px 0 0">' + pct + '% completado</p>'
-        : (i.estado === 'pendiente_pago' ? '<p class="text-sm muted">Podrás ver las lecciones cuando se confirme el pago.</p><button class="btn btn-primary btn-xs est-btn-pagar" onclick="event.stopPropagation();goTo(\'pagos\')">💳 Pagar ahora</button>'
+      (conAcceso ? '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%;background:' + color + '"></div></div><p class="text-sm" style="color:' + color + ';font-weight:700;margin:6px 0 0">' + pct + '% completado</p>' + plazoInscripcionHTML(i)
+        : (i.estado === 'vencida' ? '<p class="text-sm est-vencida" style="color:var(--clay)">El plazo venció el ' + fechaCortaEst(i.accesoHasta) + '. Conservas tu avance (' + pct + ' %).</p><button class="btn btn-primary btn-xs est-btn-renovar" onclick="event.stopPropagation();renovarEst(' + i.id + ',\'' + esc(i.curso).replace(/'/g, '') + '\',' + !Number(i.precio) + ')">🔄 Renovar</button>'
+          : i.estado === 'cerrada' ? '<p class="text-sm muted est-cerrada">Terminaste el curso el ' + fechaCortaEst(i.fechaCompletacion) + ' y el repaso terminó el ' + fechaCortaEst(i.repasoHasta) + '. Conservas tu certificado y tus notas.</p>'
+          : i.estado === 'pendiente_pago' ? '<p class="text-sm muted">' + (i.renovacion ? 'Al confirmarse el pago tendrás ' + i.mesesParaTerminar + ' meses más para terminar, con tu avance.' : 'Podrás ver las lecciones cuando se confirme el pago.') + '</p><button class="btn btn-primary btn-xs est-btn-pagar" onclick="event.stopPropagation();goTo(\'pagos\')">💳 Pagar ahora</button>'
           : i.estado === 'en_reembolso' ? '<p class="text-sm muted est-en-reembolso">Tienes una solicitud de reembolso en trámite. Si se rechaza o la cancelas, el curso vuelve a estar disponible.</p><button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();goTo(\'pagos\')">Ver mi reembolso</button>'
           : i.estado === 'retirada' ? '<p class="text-sm muted">Te retiraste de este curso. Si vuelves a inscribirte desde el catálogo, conservas tu progreso (' + pct + ' %).</p><button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();verDetalleDesdeMisCursosEst(' + i.idCurso + ')">Ver en el catálogo</button>'
           : '<p class="text-sm muted">Comunícate con el administrador.</p>')) +
@@ -338,6 +391,7 @@ function renderCursoDetalle(cont) {
     const nombre = lecciones.length ? lecciones[0].curso : (insc.curso || 'Curso');
     let html = '<div class="section-header"><div><h2>' + esc(nombre) + '</h2><p class="subtitle">' + completadas + '/' + lecciones.length + ' lecciones completadas · ' + pct + '% del curso</p></div>' +
       (lecciones.length && lecciones[0].estadoInscripcion === 'completada' ? pillInscripcion('completada') : '') + '</div>' +
+      (lecciones.length && lecciones[0].modoRepaso ? bannerRepasoHTML(lecciones[0].repasoHasta) : (insc.estado === 'activa' && insc.accesoHasta ? '<div class="card mb-14" id="est-plazo-curso" style="box-shadow:none;padding:10px 14px;background:' + (insc.diasRestantes <= 15 ? 'var(--amber-soft)' : 'var(--bone)') + '">⏳ Tienes hasta el <strong>' + fechaCortaEst(insc.accesoHasta) + '</strong> para terminar este curso (' + diasTextoEst(insc.diasRestantes) + ').</div>' : '')) +
       '<div class="progress-bar" style="margin-bottom:20px"><div class="progress-fill" id="est-curso-avance" style="width:' + pct + '%"></div></div>' +
       '<div class="text-sm" style="font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px">📖 Lecciones — ' + esc(nombre) + '</div>';
     if (!lecciones.length) html += '<div class="empty-state">Este curso todavía no tiene lecciones publicadas.</div>';
@@ -369,6 +423,7 @@ function renderLeccionDetalle(cont) {
 function pintarLeccionEst() {
   const l = EST_LECCION;
   let html = '<div class="section-header"><div><h2>' + esc(l.nombre) + '</h2><p class="subtitle">' + esc(l.curso) + (l.descripcion ? ' · ' + esc(l.descripcion) : '') + '</p></div></div>' +
+    (l.modoRepaso ? bannerRepasoHTML(l.repasoHasta) : '') +
     '<div class="card mb-14" id="est-leccion-progreso">' + progresoLeccionHTML(l) + '</div>';
   if (!l.materiales.length) html += '<div class="empty-state">Esta lección todavía no tiene contenido publicado.</div>';
   l.materiales.forEach(x => { html += materialCardHTML(x); });
@@ -381,7 +436,7 @@ function progresoLeccionHTML(l) {
   return '<div class="flex justify-between text-sm mb-8"><strong>' + (l.estadoProgreso === 'completada' ? '✓ Lección completada' : 'Tu avance en la lección') + '</strong>' +
     '<span>' + l.materialesVistos + ' de ' + l.totalMateriales + ' materiales vistos · ' + pct + '%</span></div>' +
     '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%;background:' + (l.estadoProgreso === 'completada' ? 'var(--sage)' : 'var(--amber)') + '"></div></div>' +
-    '<p class="text-sm muted" style="margin:8px 0 0">Cada material se marca como visto automáticamente cuando lo revisas: al llegar al final de una lectura, al terminar un video o después de explorar un laboratorio, un juego o un documento.</p>';
+    (l.modoRepaso ? '' : '<p class="text-sm muted" style="margin:8px 0 0">Cada material se marca como visto automáticamente cuando lo revisas: al llegar al final de una lectura, al terminar un video o después de explorar un laboratorio, un juego o un documento.</p>');
 }
 
 /* ================================================================
@@ -400,6 +455,7 @@ function materialEstudiante(id) { return (EST_LECCION && EST_LECCION.materiales 
 function estadoVistoHTML(x) {
   const s = SEGUIMIENTO[x.material.id];
   if (x.visto) return '<span class="est-visto est-visto-ok" style="font-size:13px;font-weight:700;color:var(--sage);white-space:nowrap">✓ Visto</span>';
+  if (EST_LECCION && EST_LECCION.modoRepaso) return '<span class="est-visto" style="font-size:13px;color:var(--ink-soft);white-space:nowrap">Repaso</span>';
   if (s && MATERIAL_EXPANDIDO[x.material.id]) {
     const falta = Math.max(0, s.minimos - s.segundos);
     const pista = falta > 0 ? 'En revisión · ' + falta + ' s' : (x.material.tipo === 'lectura' ? 'Llega al final del texto' : x.material.tipo === 'video' ? 'Termina el video' : 'Registrando…');
@@ -417,7 +473,7 @@ async function toggleMaterial(id) {
   MATERIAL_EXPANDIDO[id] = !MATERIAL_EXPANDIDO[id];
   pintarLeccionEst();
   const x = materialEstudiante(id);
-  if (MATERIAL_EXPANDIDO[id] && x && !x.visto && !SEGUIMIENTO[id]) {
+  if (MATERIAL_EXPANDIDO[id] && x && !x.visto && !SEGUIMIENTO[id] && !EST_LECCION.modoRepaso) {   // en repaso no se registra avance
     try {
       const a = await pedirApiEst('POST', '/api/estudiante/materiales/' + id + '/apertura');
       SEGUIMIENTO[id] = { minimos: a.segundosMinimos, segundos: a.segundosTranscurridos, criterio: false, enviando: false };

@@ -23,6 +23,7 @@ biolearn/
 
 - **Backend:** ver `backend/README.md` para instrucciones de instalación y ejecución.
 - **Frontend:** ver `frontend/README.md` (se agrega cuando el proyecto de React esté listo).
+- **Servidor (Azure + Docker):** ver `despliegue/README.md` para publicar BioLearn con MySQL, el backend y Apache en contenedores.
 
 ## Equipo
 

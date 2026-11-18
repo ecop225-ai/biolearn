@@ -2,8 +2,10 @@
    BIOLearn — biolearn_auth_core.js
    Utilidades compartidas: marca, panel lateral, modal legal, router simple
 ================================================================ */
-/* URL del backend local — requiere que BiolearnBackendApplication esté corriendo en IntelliJ */
-const API_BASE = 'http://localhost:8080';
+/* URL del backend: en el equipo de desarrollo (localhost, 127.0.0.1 o archivo abierto directamente) es el backend
+   de IntelliJ en el puerto 8080; en el servidor, Apache publica el sitio y reenvía /api al backend, así que se usa
+   la misma dirección del sitio (despliegue/README.md). */
+const API_BASE = (['localhost', '127.0.0.1', ''].includes(location.hostname) ? 'http://localhost:8080' : location.origin);
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function uid(p) { return p + '-' + Math.random().toString(36).slice(2, 8); }

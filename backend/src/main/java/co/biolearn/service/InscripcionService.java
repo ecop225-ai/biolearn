@@ -22,6 +22,9 @@ public interface InscripcionService {
 
     InscripcionResponse retirarse(Integer idInscripcion, Usuario estudiante);
 
+    /** Acceso por tiempo: renovar un curso vencido (con precio queda pendiente de pago; gratuito se activa). */
+    InscripcionResponse renovar(Integer idInscripcion, Usuario estudiante);
+
     List<LeccionEstudianteResponse> lecciones(Integer idCurso, Usuario estudiante);
 
     LeccionEstudianteResponse leccion(Integer idLeccion, Usuario estudiante);

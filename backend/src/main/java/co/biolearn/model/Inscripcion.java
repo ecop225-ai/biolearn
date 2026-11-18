@@ -43,6 +43,24 @@ public class Inscripcion {
     @Column(name = "fecha_completacion")
     private LocalDateTime fechaCompletacion;
 
+    /** Acceso por tiempo (migración 011): inicio y fin del plazo para terminar el curso. */
+    @Column(name = "acceso_desde")
+    private LocalDateTime accesoDesde;
+
+    @Column(name = "acceso_hasta")
+    private LocalDateTime accesoHasta;
+
+    /** Fin del repaso (solo lectura) de un curso completado. */
+    @Column(name = "repaso_hasta")
+    private LocalDateTime repasoHasta;
+
+    /** Avisos de 15 días ya enviados (una sola vez por plazo). */
+    @Column(name = "aviso_vencimiento_en")
+    private LocalDateTime avisoVencimientoEn;
+
+    @Column(name = "aviso_repaso_en")
+    private LocalDateTime avisoRepasoEn;
+
     @Column(name = "actualizado_en", nullable = false)
     private LocalDateTime actualizadoEn;
 

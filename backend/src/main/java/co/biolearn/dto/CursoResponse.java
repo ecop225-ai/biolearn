@@ -26,6 +26,8 @@ public class CursoResponse {
     private Boolean soloInstitucional;
     private Integer creditos;
     private Integer horasEstimadas;
+    private Integer mesesParaTerminar;
+    private Integer mesesRepaso;
     private String estado;
     private Integer idArea;
     private String area;

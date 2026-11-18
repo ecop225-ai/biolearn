@@ -1080,14 +1080,16 @@ async function abrirInscritosDocente(idCurso) {
   abrirModal('modal-doc-inscritos');
   try {
     const lista = await pedirApi('GET', '/api/cursos/' + idCurso + '/inscripciones');
-    const etiqueta = { activa: 'Activa', completada: 'Completada', pendiente_pago: 'Pendiente de pago', retirada: 'Retirada', suspendida: 'Suspendida' };
+    const etiqueta = { activa: 'Activa', completada: 'Completada (en repaso)', pendiente_pago: 'Pendiente de pago', retirada: 'Retirada', suspendida: 'Suspendida', en_reembolso: 'Reembolso en trámite', vencida: 'Plazo vencido', cerrada: 'Cerrada' };
+    const fecha = iso => { if (!iso) return ''; const d = new Date(iso); return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear(); };
+    const plazo = i => i.estado === 'activa' && i.accesoHasta ? 'hasta el ' + fecha(i.accesoHasta) : i.estado === 'completada' && i.repasoHasta ? 'repaso hasta el ' + fecha(i.repasoHasta) : i.estado === 'vencida' ? 'venció el ' + fecha(i.accesoHasta) : '';
     document.getElementById('dins-body').innerHTML = !lista.length ? '<div class="empty-state">Aún no hay estudiantes inscritos en este curso.</div>' :
       '<p class="text-sm muted">' + lista.length + ' inscripción(es) · el avance es el promedio de las lecciones activas.</p>' +
       '<div class="tabla-wrap"><table><thead><tr><th>Estudiante</th><th>Estado</th><th>Avance</th><th>Colegio</th></tr></thead><tbody>' +
       lista.map(i => {
         const pct = Math.round(Number(i.porcentaje || 0));
         return '<tr class="dins-fila" data-correo="' + esc(i.correo) + '"><td><div style="font-weight:600">' + esc(i.estudiante) + '</div><div class="text-sm muted">' + esc(i.correo) + '</div></td>' +
-          '<td>' + esc(etiqueta[i.estado] || i.estado) + '</td>' +
+          '<td>' + esc(etiqueta[i.estado] || i.estado) + (plazo(i) ? '<div class="text-sm muted dins-plazo">' + plazo(i) + '</div>' : '') + '</td>' +
           '<td style="min-width:180px"><div class="progress-bar" style="height:8px;background:#E7ECEA;border-radius:6px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:var(--sage)"></div></div>' +
           '<div class="text-sm">' + pct + ' % · ' + i.leccionesCompletadas + ' de ' + i.totalLecciones + ' lecciones</div></td>' +
           '<td class="text-sm">' + esc(i.institucion || '—') + '</td></tr>';

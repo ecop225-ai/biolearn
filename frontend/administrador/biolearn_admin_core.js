@@ -21,8 +21,10 @@ const ROLE_LABEL = { docente:'Docente', contador:'Contador', supervisor:'Represe
 const ROLE_COLOR = { docente:'var(--sage)', contador:'var(--amber)', supervisor:'var(--clay)', estudiante:'var(--blue)', admin:'var(--blue-deep)' };
 
 function uid(p) { return p + '-' + Math.random().toString(36).slice(2, 8); }
-/* URL del backend local — requiere que BiolearnBackendApplication esté corriendo en IntelliJ */
-const API_BASE = 'http://localhost:8080';
+/* URL del backend: en el equipo de desarrollo (localhost, 127.0.0.1 o archivo abierto directamente) es el backend
+   de IntelliJ en el puerto 8080; en el servidor, Apache publica el sitio y reenvía /api al backend, así que se usa
+   la misma dirección del sitio (despliegue/README.md). */
+const API_BASE = (['localhost', '127.0.0.1', ''].includes(location.hostname) ? 'http://localhost:8080' : location.origin);
 
 /** Cabeceras con el token JWT guardado al iniciar sesión desde el prototipo de Auth.
  *  Si no hay token, redirige de vuelta al login. */

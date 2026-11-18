@@ -28,12 +28,18 @@ import java.util.*;
  * - Una lección con prerrequisito queda bloqueada hasta completarlo.
  * - Progreso: materiales vistos / materiales activos; 100 % completa la lección; todas las lecciones activas
  *   completas completan el curso.
+ * - Acceso por tiempo (migración 011): el plazo para terminar empieza cuando el curso se activa (pago aprobado o
+ *   inscripción gratuita) y dura curso.meses_para_terminar. Pasado sin terminar, la inscripción queda «vencida»
+ *   (sin acceso, conserva el avance) y se renueva pagando de nuevo. Al completar el curso queda congelado en
+ *   repaso (solo lectura, el avance no cambia) durante curso.meses_repaso; después queda «cerrada».
+ *   El estado se calcula con las fechas en cada consulta (estadoVigente) y la revisión diaria lo guarda.
  */
 @Service
 @RequiredArgsConstructor
 public class InscripcionServiceImpl implements InscripcionService {
 
     static final Set<String> CON_ACCESO = Set.of("activa", "completada");
+    static final java.time.format.DateTimeFormatter FECHA = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final CursoRepository cursoRepository;
     private final InscripcionRepository inscripcionRepository;
@@ -119,8 +125,9 @@ public class InscripcionServiceImpl implements InscripcionService {
         Inscripcion insc;
         if (previa.isPresent()) {
             insc = previa.get();
-            switch (insc.getEstado()) {
-                case "retirada" -> insc.setEstado(estadoInicial);            // se reactiva y conserva el progreso
+            switch (estadoVigente(insc, LocalDateTime.now())) {
+                case "retirada", "vencida" -> insc.setEstado(estadoInicial);  // se reactiva o se renueva y conserva el progreso
+                case "cerrada" -> throw new SolicitudInvalidaException(mensajeCerrada(insc));
                 case "suspendida" -> throw new SolicitudInvalidaException("Tu inscripción en este curso está suspendida; comunícate con el administrador");
                 case "en_reembolso" -> throw new SolicitudInvalidaException("Tienes una solicitud de reembolso en trámite para este curso");
                 default -> throw new SolicitudInvalidaException("Ya estás inscrito en este curso");
@@ -128,6 +135,34 @@ public class InscripcionServiceImpl implements InscripcionService {
             if (ct != null) insc.setContratacion(ct);
         } else {
             insc = Inscripcion.builder().curso(curso).estudiante(est).contratacion(ct).estado(estadoInicial).build();
+        }
+        if ("activa".equals(insc.getEstado()) && sinPlazoVigente(insc)) iniciarPlazo(insc);   // gratuito: el plazo empieza ya
+        inscripcionRepository.save(insc);
+        if ("activa".equals(insc.getEstado())) actualizarCompletacion(insc);
+        return aInscripcion(insc, false);
+    }
+
+    /**
+     * Renovar un curso vencido: con precio queda pendiente de pago (aparece en el carrito y el pago aprobado abre un
+     * plazo nuevo); gratuito se activa de inmediato con un plazo nuevo. El avance se conserva.
+     */
+    @Override
+    @Transactional
+    public InscripcionResponse renovar(Integer idInscripcion, Usuario usuario) {
+        PerfilEstudiante est = perfilDe(usuario);
+        Inscripcion insc = inscripcionRepository.findById(idInscripcion)
+                .orElseThrow(() -> new RecursoNoEncontradoException("La inscripción indicada no existe"));
+        if (!insc.getEstudiante().getId().equals(est.getId())) throw new SinPermisoException("Esta inscripción no es tuya");
+        String vigente = estadoVigente(insc, LocalDateTime.now());
+        if ("cerrada".equals(vigente)) throw new SolicitudInvalidaException(mensajeCerrada(insc));
+        if (!"vencida".equals(vigente))
+            throw new SolicitudInvalidaException("Solo se renueva un curso cuyo plazo venció (este curso está " + vigente.replace('_', ' ') + ")");
+        if (!"activo".equals(insc.getCurso().getEstado())) throw new SolicitudInvalidaException("El curso ya no está disponible para renovar");
+        if (gratuito(insc.getCurso())) {
+            insc.setEstado("activa");
+            iniciarPlazo(insc);
+        } else {
+            insc.setEstado("pendiente_pago");
         }
         inscripcionRepository.save(insc);
         if ("activa".equals(insc.getEstado())) actualizarCompletacion(insc);
@@ -150,9 +185,10 @@ public class InscripcionServiceImpl implements InscripcionService {
         if (!insc.getEstudiante().getId().equals(est.getId())) throw new SinPermisoException("Esta inscripción no es tuya");
         if (pagoInscripcionRepository.existsByInscripcion_IdAndPago_EstadoIn(insc.getId(), List.of("pendiente")))
             throw new SolicitudInvalidaException("Tienes un pago en proceso para este curso; cancélalo o espera su resultado antes de retirarte");
-        switch (insc.getEstado()) {
+        switch (estadoVigente(insc, LocalDateTime.now())) {
             case "activa", "pendiente_pago" -> insc.setEstado("retirada");
-            case "completada" -> throw new SolicitudInvalidaException("Ya completaste este curso; no puedes retirarte");
+            case "completada", "cerrada" -> throw new SolicitudInvalidaException("Ya completaste este curso; no puedes retirarte");
+            case "vencida" -> throw new SolicitudInvalidaException("El plazo de este curso venció; puedes renovarlo cuando quieras");
             case "retirada" -> throw new SolicitudInvalidaException("Ya te retiraste de este curso");
             case "en_reembolso" -> throw new SolicitudInvalidaException("Tienes una solicitud de reembolso en trámite para este curso; cancélala o espera su resultado");
             default -> throw new SolicitudInvalidaException("Tu inscripción está suspendida; comunícate con el administrador");
@@ -179,7 +215,7 @@ public class InscripcionServiceImpl implements InscripcionService {
         Map<Integer, ProgresoLeccion> progreso = progresoPorLeccion(insc);
         exigirDesbloqueada(l, progreso);
         ProgresoLeccion p = progreso.get(l.getId());
-        if (p == null) {                                             // primera vez que la abre: en progreso
+        if (p == null && !enRepaso(insc)) {                          // primera vez que la abre: en progreso (en repaso no cambia)
             p = ProgresoLeccion.builder().inscripcion(insc).leccion(l).estado("en_progreso").iniciadoEn(LocalDateTime.now()).build();
             progresoLeccionRepository.save(p);
             progreso.put(l.getId(), p);
@@ -193,6 +229,13 @@ public class InscripcionServiceImpl implements InscripcionService {
     public AperturaMaterialResponse registrarApertura(Integer idMaterial, Usuario usuario) {
         MaterialContenido m = materialDisponible(idMaterial);
         Inscripcion insc = inscripcionDesbloqueada(m, usuario);
+        if (enRepaso(insc)) {                                         // repaso: solo lectura, no se registra nada
+            boolean visto = progresoMaterialRepository.findByInscripcion_IdAndMaterial_Id(insc.getId(), idMaterial)
+                    .map(x -> x.getVistoEn() != null).orElse(false);
+            long minimos = segundosMinimos(m);
+            return AperturaMaterialResponse.builder().idMaterial(idMaterial).tipo(m.getTipo())
+                    .segundosMinimos(minimos).segundosTranscurridos(minimos).visto(visto).modoRepaso(true).build();
+        }
         ProgresoMaterial pm = progresoMaterialRepository.findByInscripcion_IdAndMaterial_Id(insc.getId(), idMaterial)
                 .orElseGet(() -> progresoMaterialRepository.save(ProgresoMaterial.builder().inscripcion(insc).material(m).abiertoEn(LocalDateTime.now()).build()));
         long transcurridos = Math.max(0, java.time.Duration.between(pm.getAbiertoEn(), LocalDateTime.now()).getSeconds());
@@ -211,6 +254,10 @@ public class InscripcionServiceImpl implements InscripcionService {
         MaterialContenido m = materialDisponible(idMaterial);
         Inscripcion insc = inscripcionDesbloqueada(m, usuario);
         Leccion l = m.getLeccion();
+        if (enRepaso(insc)) {                                         // curso completado y congelado: el avance no cambia
+            Map<Integer, ProgresoLeccion> progreso = progresoPorLeccion(insc);
+            return aLeccion(l, insc, progreso, porcentajeCurso(insc, progreso), true);
+        }
         ProgresoMaterial pm = progresoMaterialRepository.findByInscripcion_IdAndMaterial_Id(insc.getId(), idMaterial)
                 .orElseThrow(() -> new SolicitudInvalidaException("Abre el material antes de marcarlo como visto"));
         if (pm.getVistoEn() == null) {
@@ -278,7 +325,6 @@ public class InscripcionServiceImpl implements InscripcionService {
         return progresoLeccionRepository.save(p);
     }
 
-    /** El curso se completa cuando todas sus lecciones activas están completadas (y vuelve a activo si deja de estarlo). */
     /**
      * Módulo de Pagos: el pago aprobado activa la inscripción pendiente. Si el estudiante ya había completado
      * todas las lecciones (por ejemplo, antes de retirarse), queda completada.
@@ -286,6 +332,7 @@ public class InscripcionServiceImpl implements InscripcionService {
     public void activarPorPago(Inscripcion insc) {
         if (!"pendiente_pago".equals(insc.getEstado())) return;
         insc.setEstado("activa");
+        iniciarPlazo(insc);                                           // cada pago aprobado abre un plazo completo
         inscripcionRepository.save(insc);
         actualizarCompletacion(insc);
     }
@@ -296,13 +343,61 @@ public class InscripcionServiceImpl implements InscripcionService {
         return porcentajeCurso(insc, progresoPorLeccion(insc));
     }
 
+    /**
+     * El curso se completa cuando todas sus lecciones activas están completadas. Un curso completado queda congelado:
+     * si después se agregan lecciones no vuelve a activo (acceso por tiempo). Al completarlo empieza el repaso.
+     */
     void actualizarCompletacion(Inscripcion insc) {
-        if (!CON_ACCESO.contains(insc.getEstado())) return;
+        if (!"activa".equals(insc.getEstado())) return;
         List<Leccion> activas = leccionesActivas(insc.getCurso().getId());
         Map<Integer, ProgresoLeccion> progreso = progresoPorLeccion(insc);
         boolean todas = !activas.isEmpty() && activas.stream().allMatch(l -> progreso.containsKey(l.getId()) && "completada".equals(progreso.get(l.getId()).getEstado()));
-        if (todas && !"completada".equals(insc.getEstado())) { insc.setEstado("completada"); insc.setFechaCompletacion(LocalDateTime.now()); inscripcionRepository.save(insc); }
-        if (!todas && "completada".equals(insc.getEstado())) { insc.setEstado("activa"); insc.setFechaCompletacion(null); inscripcionRepository.save(insc); }
+        if (!todas) return;
+        insc.setEstado("completada");
+        if (insc.getFechaCompletacion() == null) insc.setFechaCompletacion(LocalDateTime.now());
+        if (insc.getRepasoHasta() == null) {
+            insc.setRepasoHasta(insc.getFechaCompletacion().plusMonths(mesesRepaso(insc.getCurso())));
+            insc.setAvisoRepasoEn(null);
+        }
+        inscripcionRepository.save(insc);
+    }
+
+    // ── acceso por tiempo ───────────────────────────────────────────────────
+
+    /** Estado según las fechas, sin guardarlo: activa con el plazo vencido → vencida; completada con el repaso terminado → cerrada. */
+    public static String estadoVigente(Inscripcion i, LocalDateTime ahora) {
+        if ("activa".equals(i.getEstado()) && i.getAccesoHasta() != null && ahora.isAfter(i.getAccesoHasta())) return "vencida";
+        if ("completada".equals(i.getEstado()) && i.getRepasoHasta() != null && ahora.isAfter(i.getRepasoHasta())) return "cerrada";
+        return i.getEstado();
+    }
+
+    static boolean enRepaso(Inscripcion i) { return "completada".equals(estadoVigente(i, LocalDateTime.now())); }
+
+    /** Abre un plazo nuevo para terminar el curso (pago aprobado, inscripción gratuita o renovación). */
+    void iniciarPlazo(Inscripcion insc) {
+        LocalDateTime ahora = LocalDateTime.now();
+        insc.setAccesoDesde(ahora);
+        insc.setAccesoHasta(ahora.plusMonths(mesesParaTerminar(insc.getCurso())));
+        insc.setAvisoVencimientoEn(null);
+    }
+
+    private static boolean sinPlazoVigente(Inscripcion i) {
+        return i.getAccesoHasta() == null || LocalDateTime.now().isAfter(i.getAccesoHasta());
+    }
+
+    static int mesesParaTerminar(Curso c) { return c.getMesesParaTerminar() == null ? 12 : c.getMesesParaTerminar(); }
+    static int mesesRepaso(Curso c) { return c.getMesesRepaso() == null ? 6 : c.getMesesRepaso(); }
+
+    private static String mensajeCerrada(Inscripcion i) {
+        return "El repaso de este curso terminó" + (i.getRepasoHasta() != null ? " el " + i.getRepasoHasta().format(FECHA) : "")
+                + "; conservas tu certificado y tus notas";
+    }
+
+    /** Días que faltan para la fecha límite que aplica (terminar o repaso); null si no hay plazo corriendo. */
+    static Long diasRestantes(Inscripcion i, String vigente, LocalDateTime ahora) {
+        LocalDateTime limite = "activa".equals(vigente) ? i.getAccesoHasta() : "completada".equals(vigente) ? i.getRepasoHasta() : null;
+        if (limite == null) return null;
+        return Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(ahora.toLocalDate(), limite.toLocalDate()));
     }
 
     // ── docente y Administrador ─────────────────────────────────────────────
@@ -332,9 +427,10 @@ public class InscripcionServiceImpl implements InscripcionService {
             throw new SolicitudInvalidaException("Solo se suspende una inscripción activa, completada o pendiente de pago");
         if ("activa".equals(nuevo) && !"suspendida".equals(insc.getEstado()))
             throw new SolicitudInvalidaException("Solo se reactiva una inscripción suspendida");
-        insc.setEstado(nuevo);
+        // Reactivar devuelve el estado que tenía: completada si ya lo había terminado (conserva sus fechas)
+        insc.setEstado("activa".equals(nuevo) && insc.getFechaCompletacion() != null ? "completada" : nuevo);
         inscripcionRepository.save(insc);
-        if ("activa".equals(nuevo)) actualizarCompletacion(insc);
+        if ("activa".equals(insc.getEstado())) actualizarCompletacion(insc);
         return aInscripcion(insc, true);
     }
 
@@ -360,9 +456,15 @@ public class InscripcionServiceImpl implements InscripcionService {
     private Inscripcion inscripcionConAcceso(Integer idCurso, PerfilEstudiante est) {
         Inscripcion insc = inscripcionRepository.findByCurso_IdAndEstudiante_Id(idCurso, est.getId())
                 .orElseThrow(() -> new SinPermisoException("No estás inscrito en este curso"));
-        if (CON_ACCESO.contains(insc.getEstado())) return insc;
-        throw new SinPermisoException(switch (insc.getEstado()) {
-            case "pendiente_pago" -> "Tu inscripción está pendiente de pago; podrás ver las lecciones cuando se confirme";
+        String vigente = estadoVigente(insc, LocalDateTime.now());
+        if (CON_ACCESO.contains(vigente)) return insc;
+        throw new SinPermisoException(switch (vigente) {
+            case "vencida" -> "El plazo para terminar este curso venció" + (insc.getAccesoHasta() != null ? " el " + insc.getAccesoHasta().format(FECHA) : "")
+                    + "; renuévalo para seguir (conservas tu avance)";
+            case "cerrada" -> mensajeCerrada(insc);
+            case "pendiente_pago" -> insc.getAccesoDesde() != null
+                    ? "Tu renovación está pendiente de pago; podrás ver las lecciones cuando se confirme"
+                    : "Tu inscripción está pendiente de pago; podrás ver las lecciones cuando se confirme";
             case "suspendida" -> "Tu inscripción está suspendida; comunícate con el administrador";
             case "en_reembolso" -> "Tienes una solicitud de reembolso en trámite para este curso; el acceso vuelve si se rechaza o la cancelas";
             default -> "Te retiraste de este curso; vuelve a inscribirte para ver las lecciones";
@@ -437,8 +539,9 @@ public class InscripcionServiceImpl implements InscripcionService {
                 .docenteTitular(t != null ? t.getUsuario().getNombre() + " " + t.getUsuario().getApellido() : null)
                 .totalLecciones(activas.size()).deMiColegio(deMiColegio).soloInstitucional(soloInstitucional(c))
                 .idInscripcion(insc.map(Inscripcion::getId).orElse(null))
-                .estadoInscripcion(insc.map(Inscripcion::getEstado).orElse(null))
+                .estadoInscripcion(insc.map(i -> estadoVigente(i, LocalDateTime.now())).orElse(null))
                 .porcentaje(insc.filter(i -> CON_ACCESO.contains(i.getEstado())).map(i -> porcentajeCurso(i, progresoPorLeccion(i))).orElse(null))
+                .mesesParaTerminar(mesesParaTerminar(c)).mesesRepaso(mesesRepaso(c))
                 .lecciones(conLecciones ? activas.stream().map(Leccion::getNombre).toList() : null)
                 .build();
     }
@@ -449,9 +552,15 @@ public class InscripcionServiceImpl implements InscripcionService {
         List<Leccion> activas = leccionesActivas(c.getId());
         long completadas = activas.stream().filter(l -> progreso.containsKey(l.getId()) && "completada".equals(progreso.get(l.getId()).getEstado())).count();
         Usuario u = i.getEstudiante().getUsuario();
+        LocalDateTime ahora = LocalDateTime.now();
+        String vigente = estadoVigente(i, ahora);
         return InscripcionResponse.builder()
                 .id(i.getId()).idCurso(c.getId()).curso(c.getNombre()).codigoCurso(c.getCodigo()).color(c.getColor()).imagenPortada(c.getImagenPortada())
-                .precio(c.getPrecio()).estado(i.getEstado()).fechaInscripcion(i.getFechaInscripcion()).fechaCompletacion(i.getFechaCompletacion())
+                .precio(c.getPrecio()).estado(vigente).fechaInscripcion(i.getFechaInscripcion()).fechaCompletacion(i.getFechaCompletacion())
+                .accesoDesde(i.getAccesoDesde()).accesoHasta(i.getAccesoHasta()).repasoHasta(i.getRepasoHasta())
+                .diasRestantes(diasRestantes(i, vigente, ahora)).modoRepaso("completada".equals(vigente))
+                .renovacion("pendiente_pago".equals(vigente) && i.getAccesoDesde() != null)
+                .mesesParaTerminar(mesesParaTerminar(c)).mesesRepaso(mesesRepaso(c))
                 .institucion(i.getContratacion() != null ? i.getContratacion().getInstitucion().getNombre() : null)
                 .porcentaje(porcentajeCurso(i, progreso)).leccionesCompletadas(completadas).totalLecciones(activas.size())
                 .idEstudiante(conEstudiante ? i.getEstudiante().getId() : null)
@@ -485,7 +594,8 @@ public class InscripcionServiceImpl implements InscripcionService {
                 .estadoProgreso(p != null ? p.getEstado() : "pendiente")
                 .porcentaje(p != null ? p.getPorcentaje() : BigDecimal.ZERO)
                 .materialesVistos(vistos).totalMateriales(activos)
-                .porcentajeCurso(pc).estadoInscripcion(insc.getEstado())
+                .porcentajeCurso(pc).estadoInscripcion(estadoVigente(insc, LocalDateTime.now())).modoRepaso(enRepaso(insc))
+                .repasoHasta(insc.getRepasoHasta())
                 .materiales(materiales)
                 .build();
     }

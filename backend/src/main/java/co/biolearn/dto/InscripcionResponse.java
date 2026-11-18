@@ -22,6 +22,16 @@ public class InscripcionResponse {
     /** Institución vinculada por el código de inscripción, si se usó. */
     private String institucion;
     private BigDecimal porcentaje;
+    /** Acceso por tiempo: plazo para terminar, fin del repaso y días que faltan para la fecha que aplica. */
+    private LocalDateTime accesoDesde;
+    private LocalDateTime accesoHasta;
+    private LocalDateTime repasoHasta;
+    private Long diasRestantes;
+    private boolean modoRepaso;
+    /** Pendiente de pago por una renovación (ya tuvo un plazo antes). */
+    private boolean renovacion;
+    private Integer mesesParaTerminar;
+    private Integer mesesRepaso;
     private long leccionesCompletadas;
     private long totalLecciones;
     /** Vista del docente y del Administrador. */
