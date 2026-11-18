@@ -72,7 +72,7 @@ async function cargarUsuarios() {
     pintarOpcionesInstitucion();
     pintarTabla();
   } catch (err) {
-    document.getElementById('usr-lista').innerHTML = '<div class="empty-state">No se pudo conectar con el servidor. ¿Está corriendo en localhost:8080? (' + esc(err.message) + ')</div>';
+    document.getElementById('usr-lista').innerHTML = '<div class="empty-state">No se pudo conectar con el servidor (' + esc(API_BASE) + '). ¿Está encendido? (' + esc(err.message) + ')</div>';
   }
 }
 

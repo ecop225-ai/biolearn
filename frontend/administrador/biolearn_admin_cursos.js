@@ -68,7 +68,7 @@ async function cargarCursos() {
     llenarFiltrosCursos();
     pintarCursos();
   } catch (err) {
-    document.getElementById('cur-lista').innerHTML = '<div class="empty-state">No se pudo conectar con el servidor. ¿Está corriendo en localhost:8080? (' + esc(err.message) + ')</div>';
+    document.getElementById('cur-lista').innerHTML = '<div class="empty-state">No se pudo conectar con el servidor (' + esc(API_BASE) + '). ¿Está encendido? (' + esc(err.message) + ')</div>';
   }
 }
 

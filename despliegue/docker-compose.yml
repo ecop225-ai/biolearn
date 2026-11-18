@@ -32,7 +32,9 @@ services:
       - mysql-datos:/var/lib/mysql
       - ./mysql:/docker-entrypoint-initdb.d:ro   # 01_biolearn.sql: solo se ejecuta la primera vez (volumen vacío)
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      # Por TCP (127.0.0.1) y no por el socket: durante la primera inicialización MySQL arranca un servidor
+      # temporal sin red; así el backend espera a que termine de cargar 01_biolearn.sql antes de conectarse.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
       interval: 10s
       timeout: 5s
       retries: 30

@@ -51,7 +51,7 @@ async function cargarInstituciones() {
     INST_CACHE = await response.json();
     pintarInstituciones();
   } catch (err) {
-    document.getElementById('inst-lista').innerHTML = '<div class="empty-state">No se pudo conectar con el servidor. ¿Está corriendo en localhost:8080? (' + esc(err.message) + ')</div>';
+    document.getElementById('inst-lista').innerHTML = '<div class="empty-state">No se pudo conectar con el servidor (' + esc(API_BASE) + '). ¿Está encendido? (' + esc(err.message) + ')</div>';
   }
 }
 

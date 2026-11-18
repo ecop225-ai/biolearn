@@ -15,7 +15,7 @@ function pantallaLogin() {
     '<button class="btn-text" onclick="goTo(\'signup\')">Crear usuario</button><span style="color:var(--line)">|</span>' +
     '<button class="btn-text" onclick="goTo(\'activar\')">Activar cuenta</button></div>' +
     '<div id="login-aviso"></div>' +
-    '<p class="text-sm muted" style="text-align:center;margin-top:26px">Conectado a tu backend local (localhost:8080) · usa un usuario real ya registrado</p>';
+    '<p class="text-sm muted" style="text-align:center;margin-top:26px">' + (API_BASE.includes('localhost:8080') ? 'Conectado a tu backend local (localhost:8080) · usa un usuario real ya registrado' : 'Conectado al servidor de BioLearn · usa un usuario real ya registrado') + '</p>';
   return shellHTML(form, sidePanelHTML('Aprende Biología de forma interactiva y divertida', 'Lecciones, laboratorios y foros en un solo lugar 🌿'));
 }
 async function intentarLogin() {
@@ -64,7 +64,7 @@ async function intentarLogin() {
       toast('No hay un prototipo configurado para el rol "' + data.usuario.rol + '"', true);
     }
   } catch (err) {
-    toast(err.message || 'No se pudo conectar con el servidor. ¿Está corriendo en localhost:8080?', true);
+    toast(err.message || 'No se pudo conectar con el servidor (' + API_BASE + '). ¿Está encendido?', true);
   } finally {
     if (btn) { btn.textContent = textoOriginal; btn.disabled = false; }
   }
@@ -357,7 +357,7 @@ async function crearCuenta() {
     window._signupUsuario = data.nombreUsuario;
     SIGNUP_STEP = 'done'; render();
   } catch (err) {
-    toast(err.message || 'No se pudo conectar con el servidor. ¿Está corriendo en localhost:8080?', true);
+    toast(err.message || 'No se pudo conectar con el servidor (' + API_BASE + '). ¿Está encendido?', true);
     btn.disabled = false; btn.textContent = textoOriginal;
   }
 }
