@@ -13,7 +13,7 @@ read -rsp "Repítela: " C2; echo
 [ ${#C1} -ge 8 ] || { echo "Debe tener al menos 8 caracteres."; exit 1; }
 case "$CORREO" in *\'*) echo "Correo no válido."; exit 1;; esac
 HASH=$(docker compose exec -T apache htpasswd -nbBC 10 x "$C1" | cut -d: -f2- | tr -d '\r\n')
-docker compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" biolearn_db 2>/dev/null' <<SQL
+docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot biolearn_db' <<SQL
 UPDATE usuario SET contrasena = '$HASH' WHERE correo = '$CORREO';
 SELECT correo, estado, IF(contrasena = '$HASH', 'contraseña actualizada', 'SIN CAMBIOS') AS resultado
   FROM usuario WHERE correo = '$CORREO';

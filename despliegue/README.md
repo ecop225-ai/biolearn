@@ -6,9 +6,10 @@ El desarrollo local (IntelliJ, MySQL Workbench, `127.0.0.1:5173`) **no cambia**.
 
 | Servicio | Imagen | Qué hace | Puerto |
 |---|---|---|---|
-| `mysql` | `mysql:8.0` | Base `biolearn_db`. Datos en el volumen `mysql-datos` | interno |
+| `mysql` | `mysql:8.4` (LTS) | Base `biolearn_db`. Datos en el volumen `mysql-datos` | interno |
 | `backend` | se construye desde `backend/Dockerfile` | API de Spring Boot. Archivos subidos en el volumen `archivos` | interno (8080) |
-| `apache` | se construye desde `apache/Dockerfile` (`httpd:2.4`) | Publica `frontend/` y reenvía `/api`, `/swagger-ui` y `/v3/api-docs` al backend | **80** |
+| `apache` | se construye desde `apache/Dockerfile` (`httpd:2.4`) | Publica `frontend/` y reenvía `/api`, `/swagger-ui` y `/v3/api-docs` al backend | **80 y 443** |
+| `certbot` | `certbot/certbot` (solo a pedido) | Obtiene y renueva el certificado HTTPS | — |
 
 ```
 Navegador ──► Apache :80 ──► /prototipo-auth/…, /administrador/…  (archivos de frontend/)
@@ -31,6 +32,8 @@ en el servidor usa la misma dirección del sitio (Apache reenvía `/api`), así 
 | `scripts/aplicar_migracion.sh` | Aplica una migración nueva (hace un respaldo antes) |
 | `scripts/actualizar.sh` | `git pull` + reconstruye y reinicia los contenedores |
 | `scripts/cambiar_clave_admin.sh` | Cambia la contraseña de una cuenta (la del administrador inicial) |
+| `scripts/https.sh`, `scripts/renovar_https.sh` | Obtienen y renuevan el certificado HTTPS gratuito de Let's Encrypt para el dominio |
+| `scripts/importar_archivos.sh` | Carga en el servidor los archivos subidos (comprobantes y PDF) traídos del equipo local |
 
 ## Etapa 3 · Publicar BioLearn (primera vez)
 
@@ -80,6 +83,46 @@ Inicia sesión con `admin@biolearn.co` y la contraseña nueva.
 **3.7 (Recomendado) Limitar SSH a tu IP.** Portal de Azure → `vm-biolearn` → **Redes** → regla del puerto 22
 → **Origen**: *Mi dirección IP* → Guardar. Si tu IP de casa cambia y no puedes entrar, vuelve a esa regla
 y actualízala.
+
+## Etapa 4 · Dominio gratuito y HTTPS
+
+1. **Dominio:** en https://www.duckdns.org inicia sesión (GitHub o Google), crea el subdominio (por ejemplo
+   `biolearn-sena`) y en *current ip* escribe `64.236.158.56` → *update ip*. Comprueba desde PowerShell:
+   `nslookup biolearn-sena.duckdns.org` debe responder `64.236.158.56`.
+2. **Actualizar el servidor:** `bash scripts/actualizar.sh` (trae la configuración de HTTPS).
+3. **Configurar:** `nano .env` → `DOMINIO=biolearn-sena.duckdns.org` y `SITIO_URL=https://biolearn-sena.duckdns.org`.
+4. **Certificado:** `bash scripts/https.sh` (Let's Encrypt valida el dominio por el puerto 80 y entrega el certificado).
+5. **Aplicar la dirección nueva en el backend:** `docker compose up -d backend`.
+6. Abrir `https://biolearn-sena.duckdns.org`: candado en el navegador; `http://` y la IP redirigen a HTTPS.
+
+El certificado dura 90 días: al encender el servidor para una revisión, ejecuta `bash scripts/renovar_https.sh`.
+
+## Migrar los datos del equipo local al servidor
+
+En el equipo de desarrollo (Windows):
+1. (Opcional) En MySQL Workbench ejecuta `backend/sql/limpieza_datos_selenium.sql` para no llevar los datos de las pruebas automáticas.
+2. Workbench → **Server → Data Export** → `biolearn_db`, *Dump Structure and Data*, **Export to Self-Contained File**
+   (por ejemplo `biolearn_local.sql`) → *Start Export*.
+3. Empaqueta los archivos subidos (desde la carpeta del proyecto): `tar -czf uploads.tar.gz -C backend uploads`.
+4. Cópialos al servidor:
+   `scp -i "$env:USERPROFILE\.ssh\vm-biolearn_key.pem" biolearn_local.sql uploads.tar.gz azureuser@64.236.158.56:~/biolearn/despliegue/respaldos/`
+
+En el servidor (`~/biolearn/despliegue`):
+5. `bash scripts/respaldo.sh` (respaldo de lo que hay, por si hay que volver atrás).
+6. `bash scripts/restaurar.sh respaldos/biolearn_local.sql` y `bash scripts/importar_archivos.sh respaldos/uploads.tar.gz`.
+7. `bash scripts/cambiar_clave_admin.sh`: la base local trae la contraseña local del administrador.
+8. Validar: número de usuarios, cursos e inscripciones igual al del equipo local; abrir un PDF y un comprobante.
+
+## Migración de MySQL 8.0 a 8.4 LTS (mantenimiento adaptativo)
+
+MySQL 8.0 salió de soporte en abril de 2026. La imagen del servicio `mysql` pasó a `mysql:8.4`; al arrancar, MySQL 8.4
+actualiza solo las tablas del sistema y el diccionario de datos del volumen existente.
+1. `bash scripts/respaldo.sh` (obligatorio: una base actualizada a 8.4 no se puede volver a abrir con 8.0).
+2. `bash scripts/actualizar.sh` (descarga `mysql:8.4` y recrea el contenedor).
+3. `docker compose logs mysql | grep -i upgrade` debe mostrar la actualización de 8.0 a 8.4 completada.
+4. Verificar la versión y las 58 tablas, e iniciar sesión en el sitio.
+5. Si algo falla: volver a `mysql:8.0` en `docker-compose.yml`, borrar el volumen (`docker compose down`, `docker volume rm biolearn_mysql-datos`),
+   arrancar y restaurar el respaldo del paso 1 con `restaurar.sh`.
 
 ## Operación diaria
 

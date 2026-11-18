@@ -7,5 +7,5 @@ cd "$(dirname "$0")/.."
 MIGRACION="${1:?Indica el archivo .sql de la migración}"
 [ -f "$MIGRACION" ] || { echo "No existe $MIGRACION"; exit 1; }
 bash scripts/respaldo.sh
-docker compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4 biolearn_db 2>/dev/null' < "$MIGRACION"
+docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot --default-character-set=utf8mb4 biolearn_db' < "$MIGRACION"
 echo "Migración aplicada: $MIGRACION"

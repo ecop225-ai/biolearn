@@ -1,11 +1,12 @@
 # =====================================================================
 # BioLearn · Despliegue en un servidor Ubuntu con Docker (Azure, máquina vm-biolearn)
 #
-#   mysql   → MySQL 8.0 con la base biolearn_db (datos en el volumen mysql-datos)
+#   mysql   → MySQL 8.4 LTS con la base biolearn_db (datos en el volumen mysql-datos)
 #   backend → API de Spring Boot construida desde ../backend (archivos subidos en el volumen archivos)
-#   apache  → Apache 2.4: publica el frontend en el puerto 80 y reenvía /api y Swagger al backend
+#   apache  → Apache 2.4: publica el frontend en los puertos 80 y 443 y reenvía /api y Swagger al backend
+#   certbot → solo se usa a pedido (scripts/https.sh) para obtener y renovar el certificado HTTPS
 #
-# Solo Apache queda expuesto a Internet (puerto 80). MySQL y el backend no publican puertos:
+# Solo Apache queda expuesto a Internet (puertos 80 y 443). MySQL y el backend no publican puertos:
 # se comunican por la red interna de Docker.
 # Las claves llegan desde el archivo .env (copia de .env.example), que NUNCA se sube a GitHub.
 #
@@ -15,7 +16,7 @@ name: biolearn
 
 services:
   mysql:
-    image: mysql:8.0
+    image: mysql:8.4                         # LTS; 8.0 salió de soporte en abril de 2026 (migración en el plan de mantenimiento)
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Falta MYSQL_ROOT_PASSWORD en .env}
@@ -72,6 +73,8 @@ services:
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
       # Archivos subidos (comprobantes y PDF de los cursos)
       BIOLEARN_ARCHIVOS_RUTA: /app/uploads
+      # Detrás de Apache: respeta X-Forwarded-Proto para generar enlaces https:// (Swagger, redirecciones)
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
     volumes:
       - archivos:/app/uploads
 
@@ -81,11 +84,25 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    environment:
+      DOMINIO: ${DOMINIO:-sin-dominio}             # dominio del certificado HTTPS (vacío = solo HTTP)
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ../frontend:/usr/local/apache2/htdocs:ro   # los portales se publican tal como están en el repositorio
+      - certbot-www:/var/www/certbot:ro            # archivos de validación de Let's Encrypt
+      - letsencrypt:/etc/letsencrypt:ro            # certificados
+
+  certbot:
+    image: certbot/certbot
+    profiles: ["https"]                            # no arranca con «up»; se usa con «docker compose run»
+    volumes:
+      - certbot-www:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
 
 volumes:
   mysql-datos:
   archivos:
+  certbot-www:
+  letsencrypt:

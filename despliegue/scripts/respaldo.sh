@@ -10,7 +10,7 @@ mkdir -p respaldos
 FECHA=$(date +%Y-%m-%d_%H%M)
 
 docker compose exec -T mysql sh -c \
-  'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction --routines --triggers --default-character-set=utf8mb4 biolearn_db 2>/dev/null' \
+  'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -uroot --single-transaction --routines --triggers --default-character-set=utf8mb4 biolearn_db' \
   | gzip > "respaldos/biolearn_db_${FECHA}.sql.gz"
 
 docker compose exec -T backend tar czf - -C /app uploads > "respaldos/archivos_${FECHA}.tar.gz"
