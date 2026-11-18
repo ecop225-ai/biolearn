@@ -402,12 +402,25 @@ function toast(text, error) {
 
 /* ---------------------------- navegación ---------------------------- */
 function goTo(key) {
+  cerrarMenuMovil();
   document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
   CURRENT = key;
   render();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+/* Menú en el celular (pantallas de hasta 900 px): el menú lateral es un panel que se abre encima del contenido con el
+   botón ☰ y se cierra al elegir una opción o al tocar fuera de él. En el computador, el mismo botón lo contrae. */
+function esMovil() { return window.matchMedia('(max-width: 900px)').matches; }
+function cerrarMenuMovil() { const sb = document.getElementById('sidebar'); if (sb) sb.classList.remove('mobile-open'); }
+document.addEventListener('click', e => {
+  const sb = document.getElementById('sidebar');
+  if (!sb || !sb.classList.contains('mobile-open')) return;
+  if (sb.contains(e.target) || e.target.closest('.tb-menu-btn')) return;
+  sb.classList.remove('mobile-open');
+});
 function toggleSidebar() {
+  if (esMovil()) { document.getElementById('sidebar').classList.toggle('mobile-open'); return; }
+ 
   document.getElementById('sidebar').classList.toggle('collapsed');
 }
 function toggleNotif() {

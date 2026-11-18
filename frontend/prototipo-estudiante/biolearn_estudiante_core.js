@@ -352,6 +352,7 @@ const ICONS = {
 function iconSvg(name) { return ICONS[name] || ''; }
 
 function goTo(key) {
+  cerrarMenuMovil();
   document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
   // «Mis cursos» desde el menú vuelve a la lista aunque haya un curso o una lección abiertos
   if (key === 'cursos' && typeof CURSO_ACTIVO !== 'undefined') { CURSO_ACTIVO = null; LECCION_ACTIVA = null; }
@@ -380,7 +381,19 @@ function renderSidebar() {
     badge.textContent = unread; badge.style.display = unread>0?'flex':'none';
   }
 }
-function toggleSidebar() { SIDEBAR_COLLAPSED = !SIDEBAR_COLLAPSED; document.getElementById('sidebar').classList.toggle('collapsed', SIDEBAR_COLLAPSED); }
+/* Menú en el celular (pantallas de hasta 900 px): el menú lateral es un panel que se abre encima del contenido con el
+   botón ☰ y se cierra al elegir una opción o al tocar fuera de él. En el computador, el mismo botón lo contrae. */
+function esMovil() { return window.matchMedia('(max-width: 900px)').matches; }
+function cerrarMenuMovil() { const sb = document.getElementById('sidebar'); if (sb) sb.classList.remove('mobile-open'); }
+document.addEventListener('click', e => {
+  const sb = document.getElementById('sidebar');
+  if (!sb || !sb.classList.contains('mobile-open')) return;
+  if (sb.contains(e.target) || e.target.closest('.tb-menu-btn')) return;
+  sb.classList.remove('mobile-open');
+});
+function toggleSidebar() {
+  if (esMovil()) { document.getElementById('sidebar').classList.toggle('mobile-open'); return; }
+  SIDEBAR_COLLAPSED = !SIDEBAR_COLLAPSED; document.getElementById('sidebar').classList.toggle('collapsed', SIDEBAR_COLLAPSED); }
 function toggleNotif() { document.getElementById('notif-panel').classList.toggle('abierto'); }
 function marcarLeida(id) { const n = DATA.notificaciones.find(x=>x.id===id); if (n) n.leido = true; saveData(); renderTopbar(); }
 function irDesdeNotificacion(id, target) { marcarLeida(id); if (target) goTo(target); }

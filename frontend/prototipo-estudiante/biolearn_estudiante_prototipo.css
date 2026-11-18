@@ -253,6 +253,10 @@ textarea { resize:vertical; }
 @media (max-width: 900px) {
   #sidebar { position:fixed; z-index:500; transform:translateX(-100%); }
   #sidebar.mobile-open { transform:translateX(0); }
+  /* Menú del celular: panel fijo a la izquierda que se desliza, con el fondo oscurecido mientras está abierto */
+  #sidebar, #sidebar.collapsed { top:0; left:0; height:100vh; width:var(--sidebar-w); transition:transform .25s ease; }
+  #sidebar.mobile-open { box-shadow:0 0 0 100vmax rgba(10,25,20,.45); }
+  #sidebar.collapsed .sb-logo-text, #sidebar.collapsed .sb-group-title, #sidebar.collapsed .sb-item-label, #sidebar.collapsed .sb-user-info { display:revert; }
   #app-content { padding:20px 16px; }
   .kpi-row { flex-direction:column; }
 }
@@ -268,3 +272,23 @@ textarea { resize:vertical; }
   background:var(--blue-deep); color:#fff; font-family:inherit; font-size:14px; cursor:pointer; box-shadow:0 10px 28px rgba(20,40,34,.32); }
 .est-carrito-flotante:hover { background:var(--blue); box-shadow:0 14px 32px rgba(20,40,34,.38); }
 @media (max-width:900px) { .est-carrito-flotante { left:50%; bottom:16px; } }
+
+/* ---------------- Pantallas pequeñas (DEF-033) ----------------
+   Varias rejillas tienen sus columnas escritas en el HTML (tarjetas del Inicio, formularios en dos columnas); en el
+   celular no cabían y la página se desbordaba a la derecha. En tableta pasan a dos columnas y en celular a una. */
+@media (max-width: 900px) {
+  #app-content { min-width:0; }
+  [style*="repeat(4,1fr)"], [style*="repeat(3,1fr)"], .grid-3 { grid-template-columns:repeat(2, minmax(0,1fr)) !important; }
+}
+@media (max-width: 600px) {
+  [style*="repeat(4,1fr)"], [style*="repeat(3,1fr)"], [style*="repeat(2,1fr)"], [style*="1fr 1fr"],
+  [style*="140px 1fr"], [style*="150px 1fr"], .grid-2, .grid-3 { grid-template-columns:minmax(0,1fr) !important; }
+  .tabla-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  /* Bloques con ancho mínimo grande (tarjetas lado a lado, filtros): ocupan toda la fila y bajan uno debajo del otro */
+  #app-content .flex, #app-content [style*="display:flex"], #app-content [style*="display: flex"] { flex-wrap:wrap; }
+  /* La parte flexible de una fila (flex:1) baja a su propia línea cuando no cabe, en vez de quedar de 14 px de ancho */
+  #app-content [style*="flex:1"] { flex-basis:200px !important; }
+  #app-content [style*="minmax(280px"], #app-content [style*="minmax(260px"], #app-content [style*="minmax(240px"] { grid-template-columns:minmax(0,1fr) !important; }
+  #app-content [style*="min-width:220px"], #app-content [style*="min-width:240px"], #app-content [style*="min-width:260px"], #app-content [style*="min-width:280px"], #app-content [style*="min-width:300px"], #app-content [style*="min-width:320px"], #app-content [style*="min-width:340px"], #app-content [style*="min-width:360px"] { min-width:100% !important; max-width:100%; }
+  .tabla-wrap table { min-width:560px; }
+}
