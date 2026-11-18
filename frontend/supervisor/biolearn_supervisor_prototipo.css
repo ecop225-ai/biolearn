@@ -274,9 +274,12 @@ textarea { resize:vertical; }
   [style*="140px 1fr"], [style*="150px 1fr"], .grid-2, .grid-3 { grid-template-columns:minmax(0,1fr) !important; }
   .tabla-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   /* Bloques con ancho mínimo grande (tarjetas lado a lado, filtros): ocupan toda la fila y bajan uno debajo del otro */
-  #app-content .flex, #app-content [style*="display:flex"], #app-content [style*="display: flex"] { flex-wrap:wrap; }
+  /* Las filas bajan a la línea siguiente cuando no caben. No aplica a las gráficas de barras (.items-end) ni a las columnas
+     (cada barra con su etiqueta), que deben conservar su forma */
+  #app-content .flex:not(.items-end):not([style*="flex-direction:column"]),
+  #app-content [style*="display:flex"]:not(.items-end):not([style*="flex-direction:column"]) { flex-wrap:wrap; }
   /* La parte flexible de una fila (flex:1) baja a su propia línea cuando no cabe, en vez de quedar de 14 px de ancho */
-  #app-content [style*="flex:1"] { flex-basis:200px !important; }
+  #app-content [style*="flex:1;min-width:0"] { flex-basis:200px !important; }
   #app-content [style*="minmax(280px"], #app-content [style*="minmax(260px"], #app-content [style*="minmax(240px"] { grid-template-columns:minmax(0,1fr) !important; }
   #app-content [style*="min-width:220px"], #app-content [style*="min-width:240px"], #app-content [style*="min-width:260px"], #app-content [style*="min-width:280px"], #app-content [style*="min-width:300px"], #app-content [style*="min-width:320px"], #app-content [style*="min-width:340px"], #app-content [style*="min-width:360px"] { min-width:100% !important; max-width:100%; }
   .tabla-wrap table { min-width:560px; }
