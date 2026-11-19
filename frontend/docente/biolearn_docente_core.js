@@ -379,6 +379,8 @@ function loadData() {
     DATA = seedData();
     saveData();
   }
+  // Las notificaciones todavía no existen en el backend: la campana no muestra cifras de ejemplo del prototipo.
+  DATA.notificaciones = [];
 }
 function saveData() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); } catch (e) {}
@@ -478,7 +480,7 @@ function renderSidebar() {
 function renderNotifPanel() {
   const list = DATA.notificaciones;
   let html = '<div class="tb-notif-header">Notificaciones</div>';
-  if (list.length === 0) html += '<div class="empty-state">Sin notificaciones</div>';
+  if (list.length === 0) html += '<div class="empty-state">Las notificaciones estarán disponibles próximamente.</div>';
   list.forEach(n => {
     html += '<div class="tb-notif-item' + (n.leido ? '' : ' sin-leer') + '" onclick="irDesdeNotificacion(\'' + n.id + '\',\'' + (n.target||'') + '\')">' +
       '<div>' + esc(n.texto) + '</div><div class="fila"><span class="fecha">' + esc(n.fecha) + '</span>' +

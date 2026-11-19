@@ -109,6 +109,8 @@ let SIDEBAR_COLLAPSED = false;
 function loadData() {
   try { const raw = localStorage.getItem(STORAGE_KEY); DATA = raw ? JSON.parse(raw) : seedData(); } catch (e) { DATA = seedData(); }
   if (!DATA) DATA = seedData();
+  // Las notificaciones todavía no existen en el backend: la campana no muestra cifras de ejemplo del prototipo.
+  DATA.notificaciones = [];
 }
 function saveData() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); } catch (e) {} }
 function resetData() { DATA = seedData(); saveData(); render(); toast('Datos de prueba restablecidos'); }
@@ -242,7 +244,7 @@ function renderTopbar() {
   let html = '<div class="tb-left"><button class="tb-menu-btn" onclick="toggleSidebar()">☰</button></div>' +
     '<div class="tb-notif-wrap"><button class="tb-notif-btn" onclick="toggleNotif()">' + iconSvg('bell') + '<span class="tb-notif-badge" id="notif-badge" style="display:'+(unread>0?'flex':'none')+'">'+unread+'</span></button>' +
     '<div class="tb-notif-panel" id="notif-panel"><div class="tb-notif-header">Notificaciones</div>';
-  if (DATA.notificaciones.length === 0) html += '<div class="empty-state">Sin notificaciones</div>';
+  if (DATA.notificaciones.length === 0) html += '<div class="empty-state">Las notificaciones estarán disponibles próximamente.</div>';
   DATA.notificaciones.forEach(n => {
     html += '<div class="tb-notif-item' + (n.leido?'':' sin-leer') + '" onclick="irDesdeNotificacion(\''+n.id+'\',\''+(n.target||'')+'\')">' +
       '<div>' + esc(n.texto) + '</div><div class="fila"><span class="fecha">' + esc(n.fecha) + '</span>' + (n.target?'<span class="ver">Ver →</span>':'') + '</div></div>';
