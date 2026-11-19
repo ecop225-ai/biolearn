@@ -834,8 +834,11 @@ function abrirDocumentoPreview(id) {
   document.getElementById('preview-simple-body').innerHTML =
     (m.descripcion ? '<p class="text-sm mb-14">' + esc(m.descripcion) + '</p>' : '') +
     (m.url
-      ? '<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden"><iframe id="preview-simple-pdf" src="' + esc(urlCompleta(m.url)) + '" style="width:100%;height:460px;border:none"></iframe></div>' +
-        '<a class="btn btn-ghost btn-sm" style="margin-top:10px" href="' + esc(urlCompleta(m.url)) + '" target="_blank" rel="noopener">↗ Abrir en una pestaña nueva</a>'
+      ? (pdfIncrustableDoc()
+        ? '<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden"><iframe id="preview-simple-pdf" src="' + esc(urlCompleta(m.url)) + '" style="width:100%;height:460px;border:none"></iframe></div>'
+        : '<div style="border:1px solid var(--line);border-radius:12px;padding:22px 18px;text-align:center;background:var(--bone)"><div style="font-size:34px;line-height:1;margin-bottom:8px">📄</div>' +
+          '<p class="text-sm muted" style="margin:0">En el celular el documento se abre en el visor de PDF del teléfono.</p></div>') +
+        '<a class="btn btn-ghost btn-sm" style="margin-top:10px" href="' + esc(urlCompleta(m.url)) + '" target="_blank" rel="noopener">' + (pdfIncrustableDoc() ? '↗ Abrir en una pestaña nueva' : 'Ver PDF') + '</a>'
       : '<p class="muted">Este documento todavía no tiene archivo.</p>') + htmlApoyoEstudiante(m);
   abrirModal('modal-preview-simple');
 }
@@ -1097,3 +1100,9 @@ async function abrirInscritosDocente(idCurso) {
   } catch (err) { document.getElementById('dins-body').innerHTML = '<div class="empty-state">' + esc(err.message) + '</div>'; }
 }
 
+
+/* DEF-036 · En el celular los navegadores no muestran un PDF dentro de un iframe; se ofrece abrirlo en el visor del teléfono. */
+function pdfIncrustableDoc() {
+  if (navigator.pdfViewerEnabled === false) return false;
+  return !window.matchMedia('(max-width: 900px) and (pointer: coarse)').matches;
+}

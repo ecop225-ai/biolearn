@@ -598,7 +598,9 @@ function materialCardHTML(x) {
     if (m.tipo === 'lectura') html += '<div class="biolearn-richtext-body" style="background:' + esc(m.colorFondo || 'var(--bone)') + ';border-radius:10px;padding:16px">' + (m.contenido || '<p>Sin contenido.</p>') + '</div>' +
       '<div id="est-fin-' + m.id + '" class="est-fin-lectura" style="height:2px"></div>';
     if (m.tipo === 'articulo') html += '<div style="background:var(--bone);border-radius:10px;padding:16px;font-size:13.5px"><p style="margin:0 0 6px"><strong>' + esc(m.autores || '') + '</strong></p><p style="margin:0 0 6px;color:var(--ink-soft)">' + esc(m.revista || '') + (m.doi ? ' · DOI: ' + esc(m.doi) : '') + '</p>' + (m.descripcion ? '<p style="margin:0 0 6px">' + esc(m.descripcion) + '</p>' : '') + (m.url ? '<a href="' + esc(m.url) + '" target="_blank" rel="noopener" style="color:var(--blue);font-weight:700">Ver artículo completo →</a>' : '') + '</div>';
-    if (m.tipo === 'documento') html += m.url ? '<div style="border:1px solid var(--line);border-radius:10px;overflow:hidden"><iframe class="est-pdf" src="' + esc(urlEst(m.url)) + '" style="width:100%;height:420px;border:none"></iframe></div><a href="' + esc(urlEst(m.url)) + '" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;color:var(--blue);font-weight:700;font-size:12.5px">↗ Abrir en una pestaña nueva</a>' : '<p class="text-sm muted">Documento sin archivo.</p>';
+    if (m.tipo === 'documento') html += m.url ? (pdfIncrustable()
+        ? '<div style="border:1px solid var(--line);border-radius:10px;overflow:hidden"><iframe class="est-pdf" src="' + esc(urlEst(m.url)) + '" style="width:100%;height:420px;border:none"></iframe></div><a href="' + esc(urlEst(m.url)) + '" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;color:var(--blue);font-weight:700;font-size:12.5px">↗ Abrir en una pestaña nueva</a>'
+        : tarjetaPdfMovil(urlEst(m.url), m.nombre)) : '<p class="text-sm muted">Documento sin archivo.</p>';
     if (esInteractivo) {
       if (!m.url) html += '<p class="text-sm muted">Este material todavía no tiene enlace.</p>';
       else if (!MATERIAL_INICIADO[m.id]) {
@@ -621,4 +623,19 @@ function materialCardHTML(x) {
     html += '</div>';
   }
   return html + '</div>';
+}
+
+/* DEF-036 · Los navegadores de celular (Chrome Android, Samsung Internet) no muestran un PDF dentro de un iframe:
+   ponen un botón "Abrir" sobre un recuadro vacío. En esos equipos se muestra una tarjeta con un botón claro que
+   abre el PDF en el visor del teléfono. En el computador se mantiene el visor incrustado. */
+function pdfIncrustable() {
+  if (navigator.pdfViewerEnabled === false) return false;
+  return !window.matchMedia('(max-width: 900px) and (pointer: coarse)').matches;
+}
+function tarjetaPdfMovil(url, nombre) {
+  return '<div style="border:1px solid var(--line);border-radius:12px;padding:22px 18px;text-align:center;background:var(--bone)">' +
+    '<div style="font-size:34px;line-height:1;margin-bottom:8px">📄</div>' +
+    '<div style="font-weight:700;font-size:14px;margin-bottom:4px">' + esc(nombre || 'Documento PDF') + '</div>' +
+    '<p class="text-sm muted" style="margin:0 0 14px">En el celular el documento se abre en el visor de PDF del teléfono.</p>' +
+    '<a href="' + esc(url) + '" target="_blank" rel="noopener" class="btn btn-primary" style="display:inline-block;text-decoration:none;padding:10px 22px">Ver PDF</a></div>';
 }
