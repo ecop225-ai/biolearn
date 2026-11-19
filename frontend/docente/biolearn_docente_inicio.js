@@ -25,45 +25,79 @@ function saludoSegunHora() {
   if (h < 19) return '¡Buenas tardes';
   return '¡Buenas noches';
 }
+/* INICIO del docente conectado al backend (DEF-039). Antes mostraba cifras del prototipo (86 estudiantes, 78 %,
+   entregas y sesiones de ejemplo). Ahora usa GET /api/docente/cursos y, por cada curso activo,
+   GET /api/cursos/{id}/inscripciones. Entregas, foros y sesiones todavía no tienen datos en el backend. */
 function renderInicio(cont) {
-  const pendientes = DATA.actividades.flatMap(a => a.entregas.filter(e=>e.estado==='entregada').map(e => ({...e, actividad:a.nombre, leccionId:a.leccionId})));
-  const proximos = [
-    ...DATA.sesiones.map(s => ({...s, tipoLbl:'Sesión en línea'})),
-    ...DATA.eventos.filter(e=>e.estado==='programado').map(e => ({...e, tipoLbl:'Evento virtual'})),
-  ].sort((a,b)=> new Date(a.fechaInicio) - new Date(b.fechaInicio));
-  const e = DATA.estadisticas;
-  const mensajesNuevos = DATA.mensajes.filter(m=>!m.leido).length;
+  cont.innerHTML = bannerInicioDoc(null) + '<div id="ini-doc-cuerpo"><div class="card muted" style="padding:30px;text-align:center">Cargando tu resumen…</div></div>';
+  cargarInicioDoc();
+}
 
-  let html = '<div style="background:var(--blue-deep);border-radius:14px;padding:24px 28px;margin-bottom:22px" class="flex justify-between items-center flex-wrap gap-14">' +
-    '<div><h2 style="color:#fff;font-size:22px;margin:0 0 6px">' + saludoSegunHora() + ', ' + esc(DOCENTE.nombre.split(' ')[0]) + '! 👩\u200d🏫</h2>' +
-    '<p style="color:rgba(255,255,255,.8);font-size:14px;margin:0">Tienes ' + pendientes.length + ' entrega' + (pendientes.length===1?'':'s') + ' pendiente' + (pendientes.length===1?'':'s') + ' de revisar y ' + mensajesNuevos + ' mensaje' + (mensajesNuevos===1?'':'s') + ' nuevo' + (mensajesNuevos===1?'':'s') + '</p></div>' +
-    '<button style="background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:9px;padding:11px 20px;font-weight:700;font-size:13.5px;cursor:pointer" onclick="goTo(\'actividades\')">Ver entregas</button></div>';
+function bannerInicioDoc(r) {
+  const texto = !r ? 'Cargando…'
+    : !r.cursos.length ? 'Todavía no tienes cursos asignados. Puedes proponer uno desde «Mis cursos».'
+    : 'Tienes ' + r.activos.length + ' curso' + (r.activos.length === 1 ? '' : 's') + ' activo' + (r.activos.length === 1 ? '' : 's') +
+      ' con ' + r.estudiantes + ' estudiante' + (r.estudiantes === 1 ? '' : 's') + ' inscrito' + (r.estudiantes === 1 ? '' : 's') +
+      (r.borradores.length ? ' y ' + r.borradores.length + ' en borrador' : '') + '.';
+  return '<div id="ini-doc-banner" style="background:var(--blue-deep);border-radius:14px;padding:24px 28px;margin-bottom:22px" class="flex justify-between items-center flex-wrap gap-14">' +
+    '<div><h2 style="color:#fff;font-size:22px;margin:0 0 6px">' + saludoSegunHora() + ', ' + esc(DOCENTE.nombre.split(' ')[0]) + '! 👩‍🏫</h2>' +
+    '<p style="color:rgba(255,255,255,.8);font-size:14px;margin:0">' + texto + '</p></div>' +
+    '<button style="background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:9px;padding:11px 20px;font-weight:700;font-size:13.5px;cursor:pointer" onclick="goTo(\'cursos\')">Ver mis cursos</button></div>';
+}
 
-  html += '<div class="kpi-row">' +
-    '<div class="kpi-card" style="border-left-color:var(--sage)"><div class="kpi-top"><span>Estudiantes</span><span class="kpi-icon" style="color:var(--sage)">' + iconSvg('users') + '</span></div><div class="kpi-value">' + e.estudiantesTotal + '</div></div>' +
-    '<div class="kpi-card" style="border-left-color:var(--clay)"><div class="kpi-top"><span>Entregas pendientes</span><span class="kpi-icon" style="color:var(--clay)">' + iconSvg('check') + '</span></div><div class="kpi-value">' + pendientes.length + '</div></div>' +
-    '<div class="kpi-card" style="border-left-color:var(--sage)"><div class="kpi-top"><span>Progreso del curso</span><span class="kpi-icon" style="color:var(--sage)">' + iconSvg('chart') + '</span></div><div class="kpi-value">' + e.tasaFinalizacion + '%</div>' +
-      '<div class="progress-bar" style="margin-top:8px"><div class="progress-fill" style="width:' + e.tasaFinalizacion + '%"></div></div></div>' +
-    '<div class="kpi-card" style="border-left-color:var(--amber)"><div class="kpi-top"><span>Aportes en foros</span><span class="kpi-icon" style="color:var(--amber)">' + iconSvg('chat') + '</span></div><div class="kpi-value">' + DATA.foros.reduce((n,f)=>n+f.comentarios.length,0) + '</div></div>' +
+async function cargarInicioDoc() {
+  const cuerpo = () => document.getElementById('ini-doc-cuerpo');
+  let cursos;
+  try { cursos = await pedirApi('GET', '/api/docente/cursos'); }
+  catch (err) { if (cuerpo()) cuerpo().innerHTML = '<div class="card" style="padding:30px;text-align:center">No se pudo cargar tu resumen: ' + esc(err.message) + '</div>'; return; }
+  cursos = cursos || [];
+  const activos = cursos.filter(c => c.estado === 'activo');
+  const borradores = cursos.filter(c => c.estado === 'borrador');
+  const porCurso = {};
+  await Promise.all(activos.map(c => pedirApi('GET', '/api/cursos/' + c.id + '/inscripciones')
+    .then(l => { porCurso[c.id] = (l || []).filter(i => i.estado === 'activa' || i.estado === 'completada'); })
+    .catch(() => { porCurso[c.id] = []; })));
+  const todas = Object.values(porCurso).flat();
+  const estudiantes = new Set(todas.map(i => i.idEstudiante)).size;
+  const avance = todas.length ? Math.round(todas.reduce((s, i) => s + Number(i.porcentaje || 0), 0) / todas.length) : 0;
+  const leccionesActivas = activos.reduce((s, c) => s + (c.leccionesActivas || 0), 0);
+  const r = { cursos, activos, borradores, estudiantes };
+
+  const banner = document.getElementById('ini-doc-banner'); if (banner) banner.outerHTML = bannerInicioDoc(r);
+  if (!cuerpo()) return;
+
+  const kpi = (color, titulo, icono, valor, detalle) =>
+    '<div class="kpi-card" style="border-left-color:' + color + '"><div class="kpi-top"><span>' + titulo + '</span><span class="kpi-icon" style="color:' + color + '">' + iconSvg(icono) + '</span></div>' +
+    '<div class="kpi-value">' + valor + '</div>' + (detalle ? '<div class="text-sm muted" style="margin-top:2px">' + detalle + '</div>' : '') + '</div>';
+  let html = '<div class="kpi-row">' +
+    kpi('var(--sage)', 'Cursos activos', 'book', activos.length, cursos.length + ' en total') +
+    kpi('var(--blue)', 'Estudiantes', 'users', estudiantes, todas.length + ' inscripción(es)') +
+    kpi('var(--sage)', 'Avance promedio', 'chart', avance + '%', 'de tus estudiantes') +
+    kpi('var(--amber)', 'Lecciones activas', 'check', leccionesActivas, 'en cursos activos') +
   '</div>';
 
   html += '<div class="flex gap-14 flex-wrap mb-20" style="align-items:start">';
-  html += '<div class="card" style="flex:1.4;min-width:320px"><div class="flex justify-between items-center mb-14"><h3 style="font-size:17px;margin:0">Entregas por calificar</h3>' +
-    '<button class="btn btn-ghost btn-sm" onclick="goTo(\'actividades\')">Ver todas</button></div>';
-  if (pendientes.length === 0) html += '<div class="empty-state">No tienes entregas pendientes 🎉</div>';
-  pendientes.forEach(p => {
-    html += '<div onclick="irAEntregaInicio(\'' + p.leccionId + '\')" class="flex justify-between items-center" style="padding:12px 0;border-top:1px solid var(--line);cursor:pointer">' +
-      '<div><div style="font-size:14px;font-weight:600">' + esc(p.actividad) + '</div><div class="text-sm muted">' + esc(p.estudiante) + (p.esTardia?' · entrega tardía':'') + '</div></div>' +
-      pill(p.estado) + '</div>';
+  html += '<div class="card" style="flex:1.4;min-width:320px"><div class="flex justify-between items-center mb-14"><h3 style="font-size:17px;margin:0">Mis cursos activos</h3>' +
+    '<button class="btn btn-ghost btn-sm" onclick="goTo(\'cursos\')">Ver todos</button></div>';
+  if (!activos.length) html += '<div class="empty-state">No tienes cursos activos.</div>';
+  activos.slice().sort((a, b) => (porCurso[b.id] || []).length - (porCurso[a.id] || []).length).slice(0, 6).forEach(c => {
+    const l = porCurso[c.id] || [];
+    const pct = l.length ? Math.round(l.reduce((s, i) => s + Number(i.porcentaje || 0), 0) / l.length) : 0;
+    html += '<div onclick="goTo(\'cursos\')" style="padding:12px 0;border-top:1px solid var(--line);cursor:pointer">' +
+      '<div class="flex justify-between items-center gap-12"><div style="min-width:0"><div style="font-size:14px;font-weight:600">' + esc(c.nombre) + '</div>' +
+      '<div class="text-sm muted">' + esc(c.miRol || '') + ' · ' + l.length + ' estudiante' + (l.length === 1 ? '' : 's') + ' · ' + (c.leccionesActivas || 0) + ' lecciones activas</div></div>' +
+      '<strong style="white-space:nowrap">' + pct + '%</strong></div>' +
+      '<div class="progress-bar" style="margin-top:8px"><div class="progress-fill" style="width:' + pct + '%"></div></div></div>';
   });
   html += '</div>';
 
-  html += '<div class="card" style="flex:1;min-width:280px"><h3 style="font-size:17px;margin:0 0 14px">Próximas sesiones y eventos</h3>';
-  if (proximos.length === 0) html += '<div class="empty-state">Nada programado por ahora.</div>';
-  proximos.forEach(p => {
-    html += '<div onclick="irAProximoInicio(\'' + p.tipoLbl + '\',\'' + (p.leccionId||'') + '\')" class="flex gap-10" style="padding:12px 0;border-top:1px solid var(--line);cursor:pointer">' +
-      '<div style="width:30px;height:30px;border-radius:8px;background:var(--blue-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0">' + iconSvg('calendar') + '</div>' +
-      '<div><div style="font-size:13.5px;font-weight:600">' + esc(p.nombre) + '</div><div class="text-sm muted">' + p.tipoLbl + ' · ' + fmtDate(p.fechaInicio) + '</div></div></div>';
+  html += '<div class="card" style="flex:1;min-width:280px"><h3 style="font-size:17px;margin:0 0 14px">Cursos en borrador</h3>';
+  if (!borradores.length) html += '<div class="empty-state">No tienes cursos pendientes de publicar.</div>';
+  borradores.forEach(c => {
+    const faltan = (c.pendientesParaPublicar || []);
+    html += '<div onclick="goTo(\'cursos\')" style="padding:12px 0;border-top:1px solid var(--line);cursor:pointer">' +
+      '<div style="font-size:13.5px;font-weight:600">' + esc(c.nombre) + '</div>' +
+      '<div class="text-sm muted">' + (faltan.length ? 'Falta: ' + esc(faltan.join(', ')) : 'Listo para que el Administrador lo publique') + '</div></div>';
   });
   html += '</div></div>';
 
@@ -74,8 +108,7 @@ function renderInicio(cont) {
       '<div style="font-size:30px;margin-bottom:10px">' + a.icon + '</div><div style="font-weight:700;font-size:13.5px">' + a.label + '</div></div>';
   });
   html += '</div>';
-
-  cont.innerHTML = html;
+  cuerpo().innerHTML = html;
 }
 function irAEntregaInicio(leccionId) {
   const leccion = DATA.leccionesById[leccionId];

@@ -1,43 +1,82 @@
 /* ================================================================
    BIOLearn — biolearn_estudiante_inicio.js
+   INICIO del estudiante conectado al backend (DEF-039).
+   Antes mostraba cifras del prototipo (2 cursos, 33 %, 2 certificados, actividades y eventos de ejemplo)
+   aunque el estudiante fuera nuevo. Ahora usa GET /api/estudiante/inscripciones:
+   cursos con acceso, avance promedio, cursos terminados y el plazo más próximo a vencer.
+   Actividades, evaluaciones, sesiones, eventos y certificados todavía no tienen datos en el backend,
+   así que el Inicio no muestra cifras de ellos.
 ================================================================ */
 const ACCESO_RAPIDO_EST = [
-  { key:'cursos', label:'Mis cursos', icon:'📚' }, { key:'actividades', label:'Actividades', icon:'✏️' },
-  { key:'evaluaciones', label:'Evaluaciones', icon:'📝' }, { key:'foros', label:'Foros', icon:'💬' },
-  { key:'sesiones', label:'Sesiones', icon:'📡' }, { key:'eventos', label:'Eventos', icon:'🎥' },
-  { key:'certificados', label:'Certificados', icon:'🏅' }, { key:'notas', label:'Mis notas', icon:'📊' },
+  { key:'cursos', label:'Mis cursos', icon:'📚' }, { key:'catalogo', label:'Catálogo', icon:'🔎' },
+  { key:'actividades', label:'Actividades', icon:'✏️' }, { key:'evaluaciones', label:'Evaluaciones', icon:'📝' },
+  { key:'foros', label:'Foros', icon:'💬' }, { key:'sesiones', label:'Sesiones', icon:'📡' },
+  { key:'eventos', label:'Eventos', icon:'🎥' }, { key:'certificados', label:'Certificados', icon:'🏅' },
 ];
 function saludoHora() {
   const h = new Date().getHours();
   return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
 }
+
 function renderInicio(cont) {
-  const curso = DATA.cursos[0];
-  const lecciones = curso ? curso.lecciones.map(id=>DATA.leccionesById[id]).filter(l=>l.estado==='activa') : [];
-  const completadas = lecciones.filter(l => DATA.progresoLeccion[l.id] && DATA.progresoLeccion[l.id].estado==='completada').length;
-  const avance = lecciones.length ? Math.round((completadas/lecciones.length)*100) : 0;
-  const continuarLeccion = curso ? (lecciones.find(l=>estadoLeccion(curso,l).estado==='en_progreso') || lecciones.find(l=>estadoLeccion(curso,l).estado==='pendiente')) : null;
+  cont.innerHTML = bannerInicioEst(null) + '<div id="ini-est-cuerpo"><div class="card muted" style="padding:30px;text-align:center">Cargando tu resumen…</div></div>';
+  pedirApiEst('GET', '/api/estudiante/inscripciones')
+    .then(lista => pintarInicioEst(lista || []))
+    .catch(err => {
+      const el = document.getElementById('ini-est-cuerpo');
+      if (el) el.innerHTML = '<div class="card" style="padding:30px;text-align:center">No se pudo cargar tu resumen: ' + esc(err.message) + '</div>';
+    });
+}
 
-  const pendientesActividad = DATA.actividades.filter(a=>!a.miEntrega);
-  const pendientesEvaluacion = DATA.evaluaciones.filter(e=>e.misIntentos.length < e.intentos);
-  const proximos = [
-    ...DATA.sesiones.filter(s=>s.estado!=='finalizada').map(s=>({...s, tipoLbl:'Sesión en línea'})),
-    ...DATA.eventos.filter(e=>e.estado==='programado').map(e=>({...e, tipoLbl:'Evento virtual'})),
-  ].sort((a,b)=> new Date(a.fechaInicio) - new Date(b.fechaInicio));
-  const mensajesNuevos = DATA.mensajes.filter(m=>!m.leido).length;
+function bannerInicioEst(resumen) {
+  const nombre = esc(ESTUDIANTE.nombre.split(' ')[0]);
+  let texto = 'Cargando…', boton = '', accion = 'cursos';
+  if (resumen) {
+    if (resumen.enCurso.length) {
+      const c = resumen.enCurso[0];
+      texto = 'Sigue con «' + esc(c.curso) + '»: llevas ' + c.leccionesCompletadas + ' de ' + c.totalLecciones + ' lecciones.';
+      boton = 'Continuar aprendiendo →';
+    } else if (resumen.conAcceso.length) {
+      texto = 'Terminaste todos tus cursos. Puedes repasarlos o inscribirte en uno nuevo.';
+      boton = 'Ver catálogo →'; accion = 'catalogo';
+    } else if (resumen.pendientesPago.length) {
+      texto = 'Tienes ' + resumen.pendientesPago.length + ' curso(s) pendiente(s) de pago.';
+      boton = 'Ir a mis pagos →'; accion = 'pagos';
+    } else {
+      texto = 'Aún no estás inscrito en ningún curso. Explora el catálogo para empezar.';
+      boton = 'Ver catálogo →'; accion = 'catalogo';
+    }
+  }
+  return '<div style="background:linear-gradient(120deg,var(--blue),var(--sage));border-radius:16px;padding:22px 28px;margin-bottom:24px" class="flex justify-between items-center flex-wrap gap-14">' +
+    '<div><div style="color:#fff;font-family:\'Fraunces\',serif;font-size:21px">¡' + saludoHora() + ', ' + nombre + '! 🌱</div>' +
+    '<div style="color:rgba(255,255,255,.9);font-size:13.5px">' + texto + '</div></div>' +
+    (boton ? '<button style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:9px;padding:11px 20px;font-weight:700;font-size:13.5px;cursor:pointer" onclick="goTo(\'' + accion + '\')">' + boton + '</button>' : '') +
+    '</div>';
+}
 
-  let html = '<div style="background:linear-gradient(120deg,var(--blue),var(--sage));border-radius:16px;padding:22px 28px;margin-bottom:24px" class="flex justify-between items-center flex-wrap gap-14">' +
-    '<div><div style="color:#fff;font-family:\'Fraunces\',serif;font-size:21px">¡' + saludoHora() + ', ' + esc(ESTUDIANTE.nombre.split(' ')[0]) + '! 🌱</div>' +
-    '<div style="color:rgba(255,255,255,.9);font-size:13.5px">' +
-    (curso && continuarLeccion ? 'Tienes pendiente "' + esc(continuarLeccion.nombre) + '" y ' + mensajesNuevos + ' mensaje' + (mensajesNuevos===1?'':'s') + ' nuevo' + (mensajesNuevos===1?'':'s') : 'Tienes ' + pendientesActividad.length + ' actividad' + (pendientesActividad.length===1?'':'es') + ' pendiente' + (pendientesActividad.length===1?'':'s') + ' y ' + mensajesNuevos + ' mensaje' + (mensajesNuevos===1?'':'s') + ' nuevo' + (mensajesNuevos===1?'':'s')) +
-    '</div></div>' +
-    '<button style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:9px;padding:11px 20px;font-weight:700;font-size:13.5px;cursor:pointer" onclick="goTo(\'cursos\')">Continuar aprendiendo →</button></div>';
+function pintarInicioEst(lista) {
+  const conAcceso = lista.filter(i => i.estado === 'activa' || i.estado === 'completada');
+  const enCurso = lista.filter(i => i.estado === 'activa' && Number(i.porcentaje || 0) < 100)
+    .sort((a, b) => Number(b.porcentaje || 0) - Number(a.porcentaje || 0));
+  const terminados = lista.filter(i => i.estado === 'completada' || (i.estado === 'activa' && Number(i.porcentaje || 0) >= 100));
+  const pendientesPago = lista.filter(i => i.estado === 'pendiente_pago');
+  const avance = conAcceso.length ? Math.round(conAcceso.reduce((s, i) => s + Number(i.porcentaje || 0), 0) / conAcceso.length) : 0;
+  const porVencer = enCurso.filter(i => i.diasRestantes != null && !i.modoRepaso).sort((a, b) => a.diasRestantes - b.diasRestantes);
+  const resumen = { conAcceso, enCurso, pendientesPago };
 
-  html += '<div class="kpi-row">' +
-    '<div class="kpi-card" style="border-left-color:var(--blue)"><div class="kpi-top"><span>Cursos inscritos</span><span class="kpi-icon" style="color:var(--blue)">' + iconSvg('book') + '</span></div><div class="kpi-value">' + DATA.cursos.length + '</div></div>' +
-    '<div class="kpi-card" style="border-left-color:var(--sage)"><div class="kpi-top"><span>Avance del curso</span><span class="kpi-icon" style="color:var(--sage)">' + iconSvg('chart') + '</span></div><div class="kpi-value">' + avance + '%</div></div>' +
-    '<div class="kpi-card" style="border-left-color:var(--amber)"><div class="kpi-top"><span>Certificados obtenidos</span><span class="kpi-icon" style="color:var(--amber)">' + iconSvg('award') + '</span></div><div class="kpi-value">' + DATA.certificados.filter(c=>c.estado==='emitido').length + '</div></div>' +
-    '<div class="kpi-card" style="border-left-color:var(--clay)"><div class="kpi-top"><span>Actividades pendientes</span><span class="kpi-icon" style="color:var(--clay)">' + iconSvg('check') + '</span></div><div class="kpi-value">' + pendientesActividad.length + '</div></div>' +
+  const cont = document.getElementById('ini-est-cuerpo'); if (!cont) return;
+  const banner = cont.previousElementSibling;
+  if (banner) banner.outerHTML = bannerInicioEst(resumen);
+
+  const kpi = (color, titulo, icono, valor, detalle) =>
+    '<div class="kpi-card" style="border-left-color:' + color + '"><div class="kpi-top"><span>' + titulo + '</span><span class="kpi-icon" style="color:' + color + '">' + iconSvg(icono) + '</span></div>' +
+    '<div class="kpi-value">' + valor + '</div>' + (detalle ? '<div class="text-sm muted" style="margin-top:2px">' + detalle + '</div>' : '') + '</div>';
+
+  let html = '<div class="kpi-row">' +
+    kpi('var(--blue)', 'Cursos inscritos', 'book', conAcceso.length, pendientesPago.length ? pendientesPago.length + ' pendiente(s) de pago' : '') +
+    kpi('var(--sage)', 'Avance promedio', 'chart', avance + '%', conAcceso.length ? 'en ' + conAcceso.length + ' curso(s)' : 'sin cursos todavía') +
+    kpi('var(--amber)', 'Cursos terminados', 'award', terminados.length, '') +
+    kpi('var(--clay)', 'Próximo plazo', 'calendar', porVencer.length ? porVencer[0].diasRestantes + ' días' : '—', porVencer.length ? esc(porVencer[0].curso) : 'sin plazos activos') +
   '</div>';
 
   html += '<div class="text-sm" style="font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:12px">Acceso rápido</div>';
@@ -47,30 +86,19 @@ function renderInicio(cont) {
   });
   html += '</div>';
 
-  html += '<div class="flex gap-14 flex-wrap" style="align-items:start">';
-  html += '<div class="card" style="flex:1.4;min-width:320px"><h3 style="font-family:\'Fraunces\',serif;font-size:17px;margin:0 0 14px">Por hacer</h3>';
-  if (pendientesActividad.length === 0 && pendientesEvaluacion.length === 0) {
-    html += '<div class="empty-state">¡Estás al día! 🎉</div>';
-  } else {
-    pendientesActividad.forEach(a => {
-      html += '<div onclick="goTo(\'actividades\')" class="flex justify-between items-center" style="padding:12px 0;border-top:1px solid var(--line);cursor:pointer">' +
-        '<div><div style="font-size:14px;font-weight:600">' + esc(a.nombre) + '</div><div class="text-sm muted">Actividad · vence ' + fmtDate(a.fechaLimite) + '</div></div>' + pill('pendiente') + '</div>';
-    });
-    pendientesEvaluacion.forEach(e => {
-      html += '<div onclick="goTo(\'evaluaciones\')" class="flex justify-between items-center" style="padding:12px 0;border-top:1px solid var(--line);cursor:pointer">' +
-        '<div><div style="font-size:14px;font-weight:600">' + esc(e.nombre) + '</div><div class="text-sm muted">Evaluación · ' + (e.intentos-e.misIntentos.length) + ' intento(s) disponible(s)</div></div>' + pill('pendiente') + '</div>';
-    });
+  html += '<div class="card"><h3 style="font-family:\'Fraunces\',serif;font-size:17px;margin:0 0 14px">Cursos en progreso</h3>';
+  if (!enCurso.length) {
+    html += '<div class="empty-state">' + (conAcceso.length ? '¡Estás al día! No tienes cursos sin terminar 🎉' : 'Cuando te inscribas en un curso, aquí verás tu avance.') + '</div>';
   }
-  html += '</div>';
-
-  html += '<div class="card" style="flex:1;min-width:280px"><h3 style="font-family:\'Fraunces\',serif;font-size:17px;margin:0 0 14px">Próximas sesiones y eventos</h3>';
-  if (proximos.length === 0) html += '<div class="empty-state">Nada programado por ahora</div>';
-  proximos.forEach(p => {
-    html += '<div onclick="goTo(\'' + (p.tipoLbl==='Sesión en línea'?'sesiones':'eventos') + '\')" class="flex gap-10" style="padding:12px 0;border-top:1px solid var(--line);cursor:pointer">' +
-      '<div style="width:30px;height:30px;border-radius:8px;background:var(--blue-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0">' + iconSvg('calendar') + '</div>' +
-      '<div><div style="font-size:13.5px;font-weight:600">' + esc(p.nombre) + '</div><div class="text-sm muted">' + p.tipoLbl + ' · ' + fmtRel(p.fechaInicio) + '</div></div></div>';
+  enCurso.slice(0, 5).forEach(i => {
+    const pct = Math.round(Number(i.porcentaje || 0));
+    html += '<div onclick="goTo(\'cursos\')" style="padding:12px 0;border-top:1px solid var(--line);cursor:pointer">' +
+      '<div class="flex justify-between items-center gap-12"><div style="min-width:0"><div style="font-size:14px;font-weight:600">' + esc(i.curso) + '</div>' +
+      '<div class="text-sm muted">' + i.leccionesCompletadas + ' de ' + i.totalLecciones + ' lecciones' + (i.diasRestantes != null ? ' · quedan ' + i.diasRestantes + ' días' : '') + '</div></div>' +
+      '<strong style="white-space:nowrap">' + pct + '%</strong></div>' +
+      '<div class="progress-bar" style="margin-top:8px"><div class="progress-fill" style="width:' + pct + '%"></div></div></div>';
   });
-  html += '</div></div>';
+  html += '</div>';
 
   cont.innerHTML = html;
 }
