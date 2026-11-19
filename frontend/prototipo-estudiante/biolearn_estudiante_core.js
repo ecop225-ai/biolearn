@@ -384,7 +384,10 @@ function renderSidebar() {
 /* Menú en el celular (pantallas de hasta 900 px): el menú lateral es un panel que se abre encima del contenido con el
    botón ☰ y se cierra al elegir una opción o al tocar fuera de él. En el computador, el mismo botón lo contrae. */
 function esMovil() { return window.matchMedia('(max-width: 900px)').matches; }
-function cerrarMenuMovil() { const sb = document.getElementById('sidebar'); if (sb) sb.classList.remove('mobile-open'); }
+function cerrarMenuMovil() { const sb = document.getElementById('sidebar'); if (sb && sb.classList.contains('mobile-open')) sb.classList.remove('mobile-open'); }
+// Si se abre una ventana (por ejemplo «¿Cerrar sesión?»), el menú del celular se cierra para que no quede encima (DEF-035)
+new MutationObserver(() => { if (document.querySelector('.modal-overlay.open')) cerrarMenuMovil(); })
+  .observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['class'] });
 document.addEventListener('click', e => {
   const sb = document.getElementById('sidebar');
   if (!sb || !sb.classList.contains('mobile-open')) return;

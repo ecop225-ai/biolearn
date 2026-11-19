@@ -256,6 +256,9 @@ textarea { resize:vertical; }
   /* Menú del celular: panel fijo a la izquierda que se desliza, con el fondo oscurecido mientras está abierto */
   #sidebar, #sidebar.collapsed { top:0; left:0; height:100vh; width:var(--sidebar-w); transition:transform .25s ease; }
   #sidebar.mobile-open { box-shadow:0 0 0 100vmax rgba(10,25,20,.45); }
+  /* Las ventanas y los avisos quedan por encima del menú del celular (DEF-035) */
+  .modal-overlay { z-index:600; }
+  #toast-wrap, #toast-cnt-box { z-index:700; }
   #sidebar.collapsed .sb-logo-text, #sidebar.collapsed .sb-group-title, #sidebar.collapsed .sb-item-label, #sidebar.collapsed .sb-user-info { display:revert; }
   #app-content { padding:20px 16px; }
   .kpi-row { flex-direction:column; }
