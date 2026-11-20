@@ -29,7 +29,7 @@ const CUR_DIAS = [['lunes', 'Lunes'], ['martes', 'Martes'], ['miercoles', 'Miér
 
 function renderCursos(cont) {
   cont.innerHTML = '<div class="section-header"><div><h2>Cursos</h2>' +
-    '<p class="subtitle">Catálogo de cursos de la plataforma: datos, estado, docentes, horarios e instituciones — conectado a tu backend real</p></div>' +
+    '<p class="subtitle">Catálogo de cursos de la plataforma: datos, estado, docentes, horarios e instituciones</p></div>' +
     '<button class="btn btn-primary" onclick="abrirModalCurso()">+ Crear curso</button></div>' +
     '<div class="flex gap-10 flex-wrap mb-10">' +
     '<input id="cur-buscar" placeholder="Buscar por nombre, descripción o docente..." oninput="CUR_BUSQUEDA=this.value;pintarCursos()" style="width:300px">' +

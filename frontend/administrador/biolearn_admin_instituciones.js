@@ -15,7 +15,7 @@ let INST_BUSQUEDA = '';
 function renderInstituciones(cont) {
   // Igual que en Usuarios: la barra de filtros se dibuja una vez y al escribir solo se redibuja la tabla
   cont.innerHTML = '<div class="section-header"><div><h2>Instituciones</h2>' +
-    '<p class="subtitle">Organizaciones que contratan cupos para sus estudiantes — conectado a tu backend real</p></div>' +
+    '<p class="subtitle">Organizaciones que contratan cupos para sus estudiantes</p></div>' +
     '<button class="btn btn-primary" onclick="abrirModalInstitucion()">+ Registrar institución</button></div>' +
     '<div class="flex gap-10 flex-wrap mb-10">' +
     '<input id="inst-buscar" placeholder="Buscar por nombre, NIT, código, rector o representante..." value="' + esc(INST_BUSQUEDA) + '" oninput="INST_BUSQUEDA=this.value;pintarInstituciones()" style="width:320px">' +

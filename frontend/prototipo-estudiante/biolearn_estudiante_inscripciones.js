@@ -246,7 +246,7 @@ function pintarDetalleEst(c) {
   } else {
     html += '<button class="btn btn-primary w-full" id="est-btn-inscribir" style="justify-content:center;margin-bottom:8px" onclick="inscribirseEst(' + c.id + ',' + (conCodigo ? '\'' + EST_CODIGO.codigo + '\'' : 'null') + ')">' + (c.gratuito ? 'Inscribirme gratis' : 'Inscribirme') + '</button>' +
       (conCodigo ? '' : '<button class="btn btn-ghost w-full" style="justify-content:center" onclick="' + (enCarrito ? 'quitarDelCarrito' : 'agregarAlCarrito') + '(' + c.id + ')">' + (enCarrito ? '✓ En el carrito' : '+ Agregar al carrito') + '</button>') +
-      (!c.gratuito ? '<p class="text-sm muted" style="margin-top:10px">Tu cupo quedará reservado como «pendiente de pago»; podrás pagarlo cuando se habilite el pago en línea.</p>' : '');
+      (!c.gratuito ? '<p class="text-sm muted" style="margin-top:10px">Tu cupo queda reservado como «pendiente de pago» hasta que lo pagues en «Mis pagos» (tarjeta, PSE, Nequi o transferencia).</p>' : '');
   }
   html += '</div></div></div><div id="est-carrito-flotante-wrap"></div>';
   document.getElementById('est-detalle').innerHTML = html;

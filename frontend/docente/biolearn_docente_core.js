@@ -457,7 +457,7 @@ function renderSidebar() {
     g.items.forEach(item => {
       const active = CURRENT === item.key ? ' activo' : '';
       let extra = '';
-      if (item.key === 'actividades') {
+      if (item.key === 'actividades' && false) {   // DEF-041: las entregas aún no existen en el backend; no se muestra la cifra de ejemplo
         const pend = DATA.actividades.reduce((n,a)=> n + a.entregas.filter(e=>e.estado==='entregada').length, 0);
         if (pend > 0) extra = ' <span class="pill pill-clay" style="margin-left:auto">' + pend + '</span>';
       }

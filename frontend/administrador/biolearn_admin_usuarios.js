@@ -16,7 +16,7 @@ function renderUsuarios(cont) {
   // La barra de filtros se dibuja UNA sola vez. Al escribir en el buscador solo se redibuja la tabla
   // (antes se redibujaba todo, incluida la casilla de búsqueda, y por eso se perdía el cursor en cada letra).
   cont.innerHTML = '<div class="section-header"><div><h2>Gestión de usuarios</h2>' +
-    '<p class="subtitle">Crea y administra las cuentas de Docente, Contador y Representante institucional — conectado a tu backend real</p></div>' +
+    '<p class="subtitle">Crea y administra las cuentas de Docente, Contador y Representante institucional</p></div>' +
     '<button class="btn btn-primary" onclick="abrirModalUsuario()">+ Crear usuario</button></div>' +
     '<div class="flex gap-10 flex-wrap mb-10">' +
     '<input id="usr-buscar" placeholder="Buscar por nombre, usuario, correo o institución..." value="' + esc(USR_BUSQUEDA) + '" oninput="USR_BUSQUEDA=this.value;pintarTabla()" style="width:300px">' +

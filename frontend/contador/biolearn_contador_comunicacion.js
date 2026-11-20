@@ -71,21 +71,36 @@ function enviarMensajeCont() {
 
 /* ---------------------------- Mi perfil ---------------------------- */
 function renderPerfil(cont) {
-  let html = '<div class="section-header"><div><h2>Mi perfil</h2><p class="subtitle">Edita tu información y revisa tu historial de acceso</p></div></div>';
+  let html = '<div class="section-header"><div><h2>Mi perfil</h2><p class="subtitle">Consulta tus datos y la seguridad de tu cuenta</p></div></div>';
   html += '<div class="flex gap-18 flex-wrap">';
   html += '<div class="card" style="flex:1;min-width:300px"><h3 style="font-family:\'Fraunces\',serif;font-size:17px;margin:0 0 16px">👤 Información personal</h3>' +
-    '<div class="campo"><label>Nombre completo</label><input id="perfil-cont-nombre" value="' + esc(CONTADOR.nombre) + '"></div>' +
-    '<div class="campo"><label>Correo electrónico</label><input id="perfil-cont-email" value="' + esc(CONTADOR.email) + '"></div>' +
+    '<div class="campo"><label>Nombre completo</label><input id="perfil-cont-nombre" value="' + esc(CONTADOR.nombre) + '" disabled></div>' +
+    '<div class="campo"><label>Correo electrónico</label><input id="perfil-cont-email" value="' + esc(CONTADOR.email) + '" disabled></div>' +
     '<div class="campo"><label>Cargo</label><input value="' + esc(CONTADOR.cargo) + '" disabled></div>' +
-    '<button class="btn btn-primary" onclick="guardarPerfilCont()">Guardar cambios</button>' +
+    '<p class="text-sm muted" style="margin:0">Para corregir tus datos, comunícate con el administrador de BioLearn.</p>' +
     '<h3 style="font-family:\'Fraunces\',serif;font-size:17px;margin:26px 0 16px">🔑 Seguridad</h3>' +
-    '<div class="campo"><label>Nueva contraseña</label><input type="password" id="perfil-cont-pass" placeholder="••••••••"></div>' +
-    '<button class="btn btn-ghost" onclick="actualizarPasswordCont()">Actualizar contraseña</button></div>';
+    '<p class="text-sm muted" style="margin:0 0 12px">Por seguridad, te enviamos a tu correo un enlace de un solo uso para definir la nueva contraseña.</p>' +
+    '<button class="btn btn-ghost" onclick="solicitarCambioClave()">Enviar enlace para cambiar la contraseña</button></div>';
   html += '<div class="card" style="flex:1;min-width:300px"><h3 style="font-family:\'Fraunces\',serif;font-size:16px;margin:0 0 12px">🛡️ Historial de acceso</h3>';
-  DATA.historial.forEach(h => html += '<div class="flex justify-between text-sm" style="padding:8px 0;border-top:1px solid var(--line)"><span>' + esc(h.evento) + '</span><span class="muted">' + esc(h.fecha) + '</span></div>');
-  html += '<div style="margin-top:20px;padding-top:16px;border-top:1px dashed var(--line)"><button class="btn btn-danger" onclick="confirmarAccion(\'¿Restablecer todos los datos de prueba? Esta acción no se puede deshacer.\', resetData, \'Restablecer\')">🔄 Restablecer datos del prototipo</button></div></div>';
+  html += '<p class="text-sm muted" style="margin:0">El historial de tus accesos estará disponible próximamente.</p>';
+  html += '</div>';
   html += '</div>';
   cont.innerHTML = html;
 }
 function guardarPerfilCont() { CONTADOR.nombre = document.getElementById('perfil-cont-nombre').value.trim() || CONTADOR.nombre; render(); toast('Perfil actualizado'); }
 function actualizarPasswordCont() { document.getElementById('perfil-cont-pass').value=''; toast('Contraseña actualizada'); }
+
+/* DEF-042 · Mi perfil: los botones «Guardar cambios» y «Actualizar contraseña» del prototipo mostraban un mensaje de éxito sin guardar nada.
+   Los datos personales quedan de solo lectura (los corrige el administrador) y el cambio de contraseña usa el enlace de un solo uso
+   de la API (POST /api/auth/recuperar-password), el mismo de «Olvidé contraseña». */
+async function solicitarCambioClave() {
+  let correo = '';
+  try { correo = (JSON.parse(sessionStorage.getItem('biolearn_usuario') || '{}').correo) || ''; } catch (e) { correo = ''; }
+  if (!correo) { toast('No se encontró el correo de tu sesión; usa «Olvidé contraseña» en la pantalla de inicio.'); return; }
+  const base = (typeof API_BASE !== 'undefined') ? API_BASE : (['localhost', '127.0.0.1', ''].includes(location.hostname) ? 'http://localhost:8080' : location.origin);
+  try {
+    const r = await fetch(base + '/api/auth/recuperar-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ correo: correo }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    toast('Te enviamos a ' + correo + ' un enlace para cambiar la contraseña (vence en 30 minutos).');
+  } catch (e) { toast('No se pudo solicitar el enlace. Intenta de nuevo en unos minutos.'); }
+}

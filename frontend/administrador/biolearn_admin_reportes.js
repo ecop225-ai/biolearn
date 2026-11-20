@@ -44,6 +44,7 @@ function descargarDocReporte(nombre) { toast('Generando "' + nombre + '"... list
 
 function renderReportes(cont) {
   let html = '<div class="section-header"><div><h2>Reportes</h2><p class="subtitle">Configura y genera reportes académicos y financieros de toda la plataforma</p></div></div>';
+  html += '<div style="background:#FBF1DE;border:1px solid #E8C88A;color:#6B4A12;border-radius:12px;padding:12px 16px;margin-bottom:18px;font-size:13.5px">🚧 <strong>Sección en construcción.</strong> Los reportes académicos y las cifras de esta pantalla son de demostración. Los reportes financieros reales están en <a href="#" onclick="goTo(\'finanzas\');return false" style="color:inherit;font-weight:700">Finanzas</a>.</div>';
   html += renderReportBuilder();
   html += '<div class="flex gap-8 mb-20">' +
     '<button onclick="cambiarTabReportes(\'academico\')" style="padding:8px 16px;border-radius:9px;border:1px solid '+(REP_TAB==='academico'?'var(--blue)':'var(--line)')+';background:'+(REP_TAB==='academico'?'var(--blue-soft)':'transparent')+';color:'+(REP_TAB==='academico'?'var(--blue)':'var(--ink-soft)')+';font-weight:600;font-size:13.5px;cursor:pointer">Académico</button>' +

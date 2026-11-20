@@ -15,7 +15,7 @@ let CAT_FILTRO_USO = 'todos';    // todos | con | sin (estudiantes asociados)
 
 function renderCatalogos(cont) {
   cont.innerHTML = '<div class="section-header"><div><h2>Catálogos académicos</h2>' +
-    '<p class="subtitle">Grados y áreas académicas que se ofrecen en el registro de estudiantes y para clasificar cursos — conectado a tu backend real</p></div>' +
+    '<p class="subtitle">Grados y áreas académicas que se ofrecen en el registro de estudiantes y para clasificar cursos</p></div>' +
     '<button class="btn btn-primary" id="cat-btn-agregar" onclick="abrirModalCatalogo(CAT_TAB === \'grados\' ? \'grado\' : \'area\')"></button></div>' +
     '<div class="flex gap-8 mb-10">' +
     '<button id="cat-tab-grados" class="btn btn-sm" onclick="cambiarTabCatalogo(\'grados\')">🎓 Grados</button>' +
