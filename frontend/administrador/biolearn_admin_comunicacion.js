@@ -104,22 +104,12 @@ function renderPerfil(cont) {
   html += '</div>';
   html += '</div>';
 
-  const df = DATA.datosFacturacion;
-  html += '<div class="card" style="margin-top:18px"><h3 style="font-family:\'Fraunces\',serif;font-size:17px;margin:0 0 4px">🧾 Datos de facturación</h3>' +
-    '<p class="text-sm muted" style="margin:0 0 18px">Estos datos aparecen en el encabezado de todas las facturas que emite BioLearn — tanto las que genera el contador como las que descargan los estudiantes.</p>' +
-    '<div class="flex gap-24 flex-wrap">' +
-    '<div style="flex:1;min-width:280px">' +
-    '<div class="campo"><label>Razón social</label><input id="df-razon" value="' + esc(df.razonSocial) + '" oninput="actualizarPreviewFacturacion()"></div>' +
-    '<div class="campo"><label>NIT</label><input id="df-nit" value="' + esc(df.nit) + '" oninput="actualizarPreviewFacturacion()"></div>' +
-    '<div class="campo"><label>Dirección</label><input id="df-direccion" value="' + esc(df.direccion) + '"></div>' +
-    '<div class="campo"><label>Logotipo</label><div class="flex items-center gap-10"><img id="df-logo-preview" src="' + df.logo + '" style="height:32px;border:1px solid var(--line);border-radius:6px;padding:4px;background:#fff">' +
-    '<button type="button" class="btn btn-ghost btn-sm" onclick="subirLogoFacturacion()">⬆ Subir</button>' +
-    '<button type="button" class="btn btn-ghost btn-sm" onclick="restablecerLogoFacturacion()">↺ Restablecer</button></div></div>' +
-    '<button class="btn btn-primary" onclick="guardarDatosFacturacion()">Guardar datos de facturación</button></div>' +
-    '<div style="flex:1;min-width:280px"><div class="text-sm" style="font-weight:700;text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px">Vista previa</div><div id="df-preview"></div></div>' +
-    '</div></div>';
+  // DEF-041: el bloque «Datos de facturación» del prototipo guardaba en el navegador datos distintos de los reales.
+  // Los datos reales de las facturas se administran en Finanzas › Facturación y recaudo.
+  html += '<div class="card" style="margin-top:18px"><h3 style="font-family:\'Fraunces\',serif;font-size:17px;margin:0 0 6px">🧾 Datos de facturación</h3>' +
+    '<p class="text-sm muted" style="margin:0 0 12px">Los datos del emisor que aparecen en las facturas y la cuenta para transferencias se administran en Finanzas.</p>' +
+    '<button class="btn btn-ghost" onclick="goTo(\'finanzas\')">Ir a Finanzas › Facturación y recaudo</button></div>';
   cont.innerHTML = html;
-  actualizarPreviewFacturacion();
 }
 function actualizarPreviewFacturacion() {
   const razon = document.getElementById('df-razon').value, nit = document.getElementById('df-nit').value;
